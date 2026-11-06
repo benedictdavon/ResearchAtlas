@@ -22,6 +22,7 @@ the disk, guesses paths or asks you. In a benchmark on a real research project, 
 - [How it works](#how-it-works)
 - [Installation and usage](#installation-and-usage)
 - [Does it help?](#does-it-help)
+- [Scope](#scope)
 - [Documentation](#documentation)
 - [Development](#development)
 
@@ -163,7 +164,7 @@ python tools/copilot_sync.py --root /home/user/research/demo_project --upload --
 
 ## Does it help?
 
-A sandboxed four-arm benchmark (method in [design decision D28](docs/design-decisions.md)) ran Claude Code and
+A sandboxed four-arm benchmark ([full report](docs/benchmark.md)) ran Claude Code and
 Codex non-interactively on 9 research questions about a real project, plus 2 control questions. The arms were:
 
 - `none`: no atlas
@@ -173,16 +174,16 @@ Codex non-interactively on 9 research questions about a real project, plus 2 con
 
 Ratios are relative to `none`: the geometric mean over questions, with bootstrap 95% CIs.
 
-| agent | arm | tokens × none | cost × none | wall time × none | pass rate |
-|---|---|---|---|---|---|
-| Claude Code | none | – | – | – | 20/27 |
-| Claude Code | **atlas** | **0.49** (0.41–0.58) | **0.65** (0.55–0.75) | 0.42 | **26/27** |
-| Claude Code | dump | 1.57 | 2.62 | 0.47 | 17/18 |
-| Claude Code | hint | 1.05 | 1.06 | 0.74 | 13/18 |
-| Codex | none | – | – | – | 13/15 |
-| Codex | **atlas** | **0.42** (0.34–0.53) | **0.59** (0.50–0.68) | 0.43 | **15/15** |
-| Codex | dump | 3.74 | 2.35 | 1.87 | 12/13 |
-| Codex | hint | 0.92 | 0.98 | 0.99 | 10/15 |
+| agent | arm | tokens × none | cost × none | wall time × none | pass rate | cost per pass |
+|---|---|---|---|---|---|---|
+| Claude Code | none | – | – | – | 20/27 | $0.49 |
+| Claude Code | **atlas** | **0.49** (0.41–0.58) | **0.65** (0.55–0.75) | 0.42 | **26/27** | **$0.24** |
+| Claude Code | dump | 1.57 | 2.62 | 0.47 | 17/18 | $0.95 |
+| Claude Code | hint | 1.05 | 1.06 | 0.74 | 13/18 | $0.58 |
+| Codex | none | – | – | – | 13/15 | $0.44 |
+| Codex | **atlas** | **0.42** (0.34–0.53) | **0.59** (0.50–0.68) | 0.43 | **15/15** | **$0.22** |
+| Codex | dump | 3.74 | 2.35 | 1.87 | 12/13 | $0.97 |
+| Codex | hint | 0.92 | 0.98 | 0.99 | 10/15 | $0.53 |
 
 - The atlas pointer roughly **halved token use** and **cut wall time by more than half**, with the same or better
   answer quality.
@@ -190,7 +191,17 @@ Ratios are relative to `none`: the geometric mean over questions, with bootstrap
 - Dumping the whole knowledge base into context gave similar quality at 1.6–3.7× the tokens.
 - A folder hint did not substitute for the atlas.
 
-These numbers are from one project with 9 questions, so treat them as indicative.
+These numbers are from one project with 9 questions, so treat them as indicative. The benchmark cost $91.54 in
+API spend; the [report](docs/benchmark.md) has the questions, isolation, grading, per-question results and
+limitations.
+
+## Scope
+
+ResearchAtlas was built for one long-running research project: a single repository of dated experiment folders
+on shared data mounts, worked on daily with several coding agents, where the same datasets and decisions come up
+across hundreds of sessions. It has been in use there since October 2026, built from 261 sessions. It has not yet
+been tried on several projects at once, on knowledge shared across projects, on teams, or on very different
+project shapes. [Background and scope](docs/background.md) says what it assumes and what is untested.
 
 ## Documentation
 

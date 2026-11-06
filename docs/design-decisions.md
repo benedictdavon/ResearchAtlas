@@ -208,8 +208,7 @@ the original project.
   - A fixed set of questions with atomic rubrics and ground truth checked on disk: most need research history, a
     few are controls that don't.
   - Four arms that differ only in the standing instructions the agent sees: `none` (no atlas), `atlas` (the pointer
-    line of architecture.md §6), `dump` (the knowledge files placed directly into the instructions), `hint` (a folder hint
-    only).
+    line), `dump` (an instruction to read every knowledge file in full first), `hint` (a folder hint only).
   - Each agent runs as normally configured, fresh and non-persistent (D20), inside a read-only `bwrap` sandbox that
     replaces the on-disk instruction files per arm and hides the atlas from `none`/`hint` (transcript-formats.md, "Agent isolation for
     benchmarks").
@@ -220,6 +219,7 @@ the original project.
   design was kept; dumping the knowledge into context was not adopted.
 - **Lesson:** budget guards based on list-price estimates can undercount real billing. Use a lower cap and check
   actual billing.
+- **Report:** [benchmark.md](benchmark.md).
 
 ### D29 — Installable `researchatlas` CLI with an atlas home
 - **Alternatives:** keep running `python atlas.py` from a clone with `config.toml` next to the code; a full

@@ -19,7 +19,8 @@ trigger actually happens, and the decision is recorded in [design-decisions.md](
 | **Incremental Copilot upload** | Transfer only changed chat logs | Full-snapshot uploads (D24) become too slow or large |
 | **Compaction history scanning** | Harvest paths from Codex `compacted.replacement_history` / `retained_context` | Path-recall audits show meaningful misses there (transcript-formats.md, "Path harvesting") |
 
-Principle (D2): every component must fix a limit that was actually observed in use.
+Principle (D2): every component must fix a limit that was actually observed in use. What the current design has and
+hasn't been tried on is in [background.md](background.md#not-yet-tested).
 
 ## Built after the first version
 
