@@ -224,4 +224,4 @@ guidelines and [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 
-[MIT](LICENSE) © 2026 Benedict Davon
+[MIT](LICENSE) © 2026 Benedict Davon M

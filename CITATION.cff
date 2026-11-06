@@ -3,8 +3,8 @@ message: "If you use ResearchAtlas in your work, please cite it as below."
 title: "ResearchAtlas: a verified, cited knowledge base mined from coding-agent transcripts"
 type: software
 authors:
-  - given-names: Benedict
-    family-names: Davon
+  - given-names: Benedict Davon
+    family-names: M
 version: 0.1.0
 date-released: 2026-11-06
 license: MIT

@@ -9,7 +9,7 @@ description = "Mine coding-agent transcripts (Codex, Claude Code, Copilot) into 
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "Benedict Davon" }]
+authors = [{ name = "Benedict Davon M" }]
 keywords = ["coding-agents", "knowledge-base", "transcripts", "research-data", "claude-code", "codex", "copilot"]
 classifiers = [
   "Development Status :: 4 - Beta",
