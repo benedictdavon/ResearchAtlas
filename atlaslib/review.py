@@ -14,7 +14,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from atlaslib.core import ATLAS_DIR, read_jsonl, work_paths
+from atlaslib.core import read_jsonl, work_paths
 
 SHA_LEN = 12
 # Session lines printed by refresh (print_sessions); mark-reviewed --report parses them back.
@@ -25,14 +25,15 @@ def session_key(rec):
     return f"{rec['source']}:{rec['id']}"
 
 
-def condensed_file(rec):
+def condensed_file(rec, home=None):
+    """Condensed transcript path; index paths are relative to the atlas home."""
     cp = rec.get("condensed_path")
-    return os.path.normpath(ATLAS_DIR / cp) if cp else None
+    return os.path.normpath(Path(home or "") / cp) if cp else None
 
 
-def condensed_digest(rec):
+def condensed_digest(rec, home=None):
     """(sha, bytes) of a session's condensed transcript, or (None, None) when it has none."""
-    path = condensed_file(rec)
+    path = condensed_file(rec, home)
     if not path or not os.path.isfile(path):
         return None, None
     with open(path, "rb") as fh:
@@ -57,11 +58,11 @@ def save_ledger(path, ledger):
     os.replace(tmp, path)
 
 
-def pending_sessions(index_rows, ledger):
+def pending_sessions(index_rows, ledger, home=None):
     """Split indexed sessions into (new, changed). Each item is (record, sha, bytes, reviewed row or None)."""
     new, changed = [], []
     for rec in index_rows:
-        sha, size = condensed_digest(rec)
+        sha, size = condensed_digest(rec, home)
         row = ledger.get(session_key(rec))
         if row is None:
             new.append((rec, sha, size, None))
@@ -131,7 +132,7 @@ def cmd_mark_reviewed(cfg, args):
     today = datetime.now(UTC).strftime("%Y-%m-%d")
     stale, unchanged = [], 0
     for key in sorted(chosen):
-        sha, size = condensed_digest(index[key])
+        sha, size = condensed_digest(index[key], cfg["home"])
         if key in reported_sha and reported_sha[key] != sha:
             # The session changed after the report was written: record what was reviewed, so it stays pending.
             stale.append(key)
@@ -150,7 +151,7 @@ def cmd_mark_reviewed(cfg, args):
     save_ledger(ledger_path, ledger)
     print(
         f"marked {len(chosen) - unchanged} session(s) reviewed ({unchanged} already up to date) "
-        f"in {os.path.relpath(ledger_path, ATLAS_DIR)}"
+        f"in {os.path.relpath(ledger_path, cfg['home'])}"
     )
     for key in stale:
         print(f"  note: {key} changed after the report was written; it stays pending for its new content")

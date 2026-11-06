@@ -141,8 +141,9 @@ def upload(archive, host, port, atlas_dir, remote_python):
         subprocess.run(
             ["scp", "-P", str(port), "-o", "ConnectTimeout=10", str(archive), host + ":" + remote], check=True
         )
-        command = [remote_python, atlas_dir + "/atlas.py", "import-copilot", remote, "--extract"]
-        subprocess.run(ssh + [shlex.join(command)], check=True)
+        # cd into the atlas home so `-m atlaslib` works from a source checkout as well as a pip install.
+        command = [remote_python, "-m", "atlaslib", "--config", "config.toml", "import-copilot", remote, "--extract"]
+        subprocess.run(ssh + [shlex.join(["cd", atlas_dir]) + " && " + shlex.join(command)], check=True)
     finally:
         try:
             subprocess.run(ssh + [shlex.join(["rm", "-f", "--", remote])], check=True)
@@ -169,8 +170,14 @@ def main(argv=None):
     parser.add_argument("--upload", action="store_true", help="upload and extract; otherwise preview only")
     parser.add_argument("--host", help="SSH alias or user@hostname")
     parser.add_argument("--port", type=int, default=22)
-    parser.add_argument("--atlas-dir", help="absolute ResearchAtlas path on the server (required with --upload)")
-    parser.add_argument("--remote-python", default="/opt/conda/bin/python")
+    parser.add_argument(
+        "--atlas-dir", help="absolute atlas home on the server, the folder holding config.toml (required with --upload)"
+    )
+    parser.add_argument(
+        "--remote-python",
+        default="/usr/bin/python3",
+        help="absolute server-side Python that can import atlaslib (default /usr/bin/python3)",
+    )
     args = parser.parse_args(argv)
     if args.storage is None:
         parser.error("--storage is required when APPDATA is not set")

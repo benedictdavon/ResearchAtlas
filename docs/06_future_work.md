@@ -26,5 +26,5 @@ Principle (D2): every component must fix a limit that was actually observed in u
 - **GitHub Copilot source** (D22, D23): Chat-panel op logs, Copilot agent sessions and server-side transcripts, in
   `atlaslib/sources/copilot.py`. The VS Code agent-host store (`agentSessionData/*/session.db`) is deliberately not
   read.
-- **Client-side Copilot uploader** (D24): `tools/copilot_sync.py` + `atlas.py import-copilot`.
+- **Client-side Copilot uploader** (D24): `tools/copilot_sync.py` + `researchatlas import-copilot`.
 - **Per-session review ledger** (D25), **section-aware `find`** (D26).

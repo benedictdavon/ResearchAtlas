@@ -7,22 +7,76 @@ import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
-ATLAS_DIR = Path(__file__).resolve().parent.parent
+SOURCE_DIR = Path(__file__).resolve().parent.parent
+HOME_ENV = "RESEARCHATLAS_HOME"
+
+
+class ConfigError(Exception):
+    """The configuration file is missing or invalid."""
+
+
+def default_home():
+    """Atlas home: $RESEARCHATLAS_HOME, else the source checkout atlaslib runs from, else ~/.researchatlas."""
+    env = os.environ.get(HOME_ENV)
+    if env:
+        return Path(env).expanduser().resolve()
+    if (SOURCE_DIR / "pyproject.toml").is_file() and (SOURCE_DIR / "atlas.py").is_file():
+        return SOURCE_DIR
+    return Path.home() / ".researchatlas"
+
+
+def _expand(value):
+    return os.path.expanduser(value) if isinstance(value, str) else value
+
+
+def _expand_paths(cfg):
+    """Expand a leading ~ in every configured path (sources, project roots, path roots, abbreviations)."""
+    src = cfg.setdefault("sources", {})
+    for key, value in list(src.items()):
+        src[key] = _expand(value)
+    cop = src.get("copilot")
+    if isinstance(cop, dict):
+        for key in ("chat_storage", "agent_state", "vscode_storage"):
+            cop[key] = _expand(cop.get(key))
+        cop["chat_dirs"] = [{k: _expand(v) for k, v in d.items()} for d in cop.get("chat_dirs") or []]
+        cop["workspace_cwd"] = {k: _expand(v) for k, v in (cop.get("workspace_cwd") or {}).items()}
+    proj = cfg["project"]
+    for key in ("roots", "cwd_also", "exclude_cwd"):
+        if key in proj:
+            proj[key] = [_expand(v) for v in proj[key]]
+    cfg["paths"]["roots"] = [_expand(v) for v in cfg["paths"]["roots"]]
+    abbrev = cfg.setdefault("knowledge", {}).get("abbreviations", {})
+    cfg["knowledge"]["abbreviations"] = {k: _expand(v) for k, v in abbrev.items()}
 
 
 def load_config(path=None):
-    path = Path(path) if path else ATLAS_DIR / "config.toml"
+    """Load config.toml. Relative work/knowledge/ledger/mirror paths resolve against the config file's folder."""
+    path = Path(path).expanduser() if path else default_home() / "config.toml"
+    if not path.is_file():
+        raise ConfigError(f"no config file at {path}. Create one with `researchatlas init`, or pass --config.")
     with open(path, "rb") as fh:
-        cfg = tomllib.load(fh)
+        try:
+            cfg = tomllib.load(fh)
+        except tomllib.TOMLDecodeError as exc:
+            raise ConfigError(f"{path}: {exc}") from None
+    for section in ("project", "paths", "limits"):
+        if section not in cfg:
+            raise ConfigError(f"{path}: missing [{section}] section")
+    home = path.resolve().parent
+    cfg["home"] = home
+    _expand_paths(cfg)
     proj = cfg["project"]
-    proj["work_dir"] = ATLAS_DIR / proj["work_dir"]
-    proj["knowledge_dir"] = ATLAS_DIR / proj["knowledge_dir"]
+    proj["work_dir"] = home / proj["work_dir"]
+    proj["knowledge_dir"] = home / proj["knowledge_dir"]
     # Review ledger (D25): committed next to knowledge/, unless configured elsewhere.
     proj["review_ledger"] = (
-        ATLAS_DIR / proj["review_ledger"]
+        home / proj["review_ledger"]
         if proj.get("review_ledger")
         else proj["knowledge_dir"].parent / "reviewed_sessions.jsonl"
     )
+    cop = cfg["sources"].get("copilot")
+    if isinstance(cop, dict) and cop.get("chat_storage"):
+        cop["chat_storage"] = str(home / cop["chat_storage"])
     return cfg
 
 

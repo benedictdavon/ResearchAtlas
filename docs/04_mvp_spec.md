@@ -16,11 +16,13 @@ tools, multi-project support beyond leaving room for it. See `06_future_work.md`
 ## Layout
 
 ```
-ResearchAtlas/                    # git repo; work/ gitignored
+ResearchAtlas/                    # source checkout; also the default atlas home when run from it
 ├── AGENTS.md / CLAUDE.md         # "read docs/README.md first" + rules
 ├── docs/                         # this docs set
-├── atlas.py                      # single CLI entry, stdlib only (thin shim, D23)
+├── pyproject.toml                # package metadata; installs the `researchatlas` command (D29)
+├── atlas.py                      # `python atlas.py` from a checkout (thin shim, D23)
 ├── atlaslib/                     # core, extract, paths, refresh, review, find, copilot_import, cli
+│   ├── config.example.toml       # template written by `researchatlas init`
 │   └── sources/                  # codex.py, claude.py, copilot.py behind a small registry
 ├── tools/copilot_sync.py         # optional client-side selective Copilot upload over SSH/SCP (D24)
 ├── tests/                        # stdlib unittest, synthetic transcripts only
@@ -49,8 +51,10 @@ ResearchAtlas/                    # git repo; work/ gitignored
 
 ## Configuration
 
-`config.toml` next to `atlas.py` (or `--config <path>`), read with `tomllib`. Relative `work_dir`,
-`knowledge_dir` and `review_ledger` are resolved against the atlas folder.
+`config.toml` in the atlas home (or `--config <path>`), read with `tomllib`. The atlas home is `$RESEARCHATLAS_HOME`,
+else the source checkout when run from one, else `~/.researchatlas` (D29); `researchatlas init` writes the template
+there. The folder holding `config.toml` is the home: relative `work_dir`, `knowledge_dir`, `review_ledger` and
+`chat_storage` resolve against it, and every path may start with `~`.
 
 ```toml
 [sources]
@@ -59,7 +63,7 @@ codex_session_index = "/home/user/.codex/session_index.jsonl"
 claude_projects = "/home/user/.claude/projects"
 
 [sources.copilot]                      # optional (D22, D24); omit keys you don't use
-chat_storage = "/home/user/ResearchAtlas/work/copilot_import/workspaceStorage"   # must be exactly this path for import-copilot
+chat_storage = "work/copilot_import/workspaceStorage"   # must be exactly this (relative to the home) for import-copilot
 chat_dirs = [ { path = "/home/user/copilot_import/chatSessions", cwd = "/home/user/research/demo_project" } ]
 agent_state = "/home/user/.copilot/session-state"
 vscode_storage = "/home/user/.vscode-server/data/User/workspaceStorage"
@@ -72,7 +76,7 @@ knowledge_dir = "projects/demo_project/knowledge"
 # review_ledger = "projects/demo_project/reviewed_sessions.jsonl"   # default: next to knowledge/
 roots = ["/home/user/research/demo_project"]          # selection by cwd and by mention
 cwd_also = ["/home/user/research"]                     # selection by cwd only
-exclude_cwd = ["/home/user/ResearchAtlas"]             # never selected (D16)
+exclude_cwd = ["~/.researchatlas"]                    # never selected (D16)
 exclude_ids = []                                       # ids / id prefixes of test sessions (D20)
 
 [paths]
@@ -94,7 +98,7 @@ new_path_min_sessions = 1
 
 ## Components
 
-### 1. `atlas.py extract [--force]`
+### 1. `researchatlas extract [--force]`
 Reads Codex, Claude Code and GitHub Copilot transcripts and writes condensed per-session markdown plus a metadata
 index. Rules per source: 02, "Transcript parsing rules".
 
@@ -116,7 +120,7 @@ index. Rules per source: 02, "Transcript parsing rules".
   sessions are cached in `unselected.jsonl`; outputs of sessions no longer selected are removed. One unreadable
   transcript produces a warning, not a failed run.
 
-### 2. `atlas.py paths [--no-verify]`
+### 2. `researchatlas paths [--no-verify]`
 - Aggregates the per-session path hits into one record per path: `path`, `root`, `first_seen`, `last_seen`,
   `n_sessions`, `n_mentions`, `session_ids` (newest first, capped at `max_session_ids`), `kind` (guess by extension:
   data, notebook, code, doc, config, figure, model; else `dir` or `other`).
@@ -126,10 +130,10 @@ index. Rules per source: 02, "Transcript parsing rules".
 - Output: `paths.jsonl`, plus a summary (counts by status, root and kind; top paths) on stdout. `--no-verify` keeps
   the previous verification fields.
 
-### Post-MVP: `atlas.py import-copilot <archive> [--extract]` (D24)
+### Post-MVP: `researchatlas import-copilot <archive> [--extract]` (D24)
 - Receives a ZIP from `tools/copilot_sync.py` containing only `<hash>/workspace.json` and
   `<hash>/chatSessions/<uuid>.jsonl` entries.
-- Requires `[sources.copilot].chat_storage` to be `<atlas>/work/copilot_import/workspaceStorage`.
+- Requires `[sources.copilot].chat_storage` to be `<atlas home>/work/copilot_import/workspaceStorage`.
 - Rejects unexpected, duplicate or symlink entries, oversized `workspace.json`, workspaces without a folder, and
   workspaces outside the project selection (`roots` + `cwd_also`, minus `exclude_cwd`).
 - Stages everything, then replaces changed files atomically; unchanged files (and their mtimes) are kept, and older
@@ -149,7 +153,7 @@ handoff/summary documents and the experiment folders' READMEs/results. Related r
 - **decisions.md:** accepted and rejected hypotheses and baselines, with dates, superseded markers, sources.
 - **open_questions.md:** §1 questions for the user, §3 result conflicts (other sections as the project needs).
 - **INDEX.md:** ≤ ~60 lines: what each file holds, top datasets at a glance, how to search (`grep -n`,
-  `atlas.py find`), when to run `refresh`.
+  `researchatlas find`), when to run `refresh`.
 
 **Citation format:** `[codex:0190abcd-1234 2026-01-02]`, `[claude:1a2b3c4d 2026-01-02]`,
 `[copilot:5e6f7a8b 2026-01-02]`, `[file:experiments/run_01/README.md]`. Verified paths are marked `✓ <date>`,
@@ -158,7 +162,7 @@ known-missing ones `✗ <date>`, unverified leads `? lead`. Paths may be written
 
 The repeatable incremental version of this step is `docs/prompts/incremental_update.md`.
 
-### 4. `atlas.py refresh` and `atlas.py mark-reviewed`
+### 4. `researchatlas refresh` and `researchatlas mark-reviewed`
 `refresh` runs `extract` and `paths` (their output captured), then prints a report. It writes no review state.
 
 - **Step 3a: sessions.** Compares the index with the review ledger (D25) and lists "New sessions (not reviewed)"
@@ -178,7 +182,7 @@ The agent then updates `knowledge/` from the report (docs/prompts/incremental_up
 (`<source>:<id prefix>` or a bare prefix) limit it to some sessions; `--note` stores a note. Any unknown, ambiguous
 or unlisted id aborts without writing (exit 2). A session that changed after the report stays pending.
 
-### 5. `atlas.py find <words…> [--limit N]`
+### 5. `researchatlas find <words…> [--limit N]`
 Case-insensitive search: `knowledge/*.md` first (per Markdown section, all words in the section or its heading path;
 output `file:line  heading path` plus up to 3 snippet lines), then `paths.jsonl` (existing paths first, then by
 session count), then the condensed sessions (matched per message, aggregated per file). `--limit` (default 10)
@@ -188,7 +192,7 @@ applies per group. Stdlib only, no index (D26).
 - Global instruction files, a few lines each: `~/.codex/AGENTS.md` (Codex) and `~/.claude/CLAUDE.md` (Claude Code),
   or the equivalent for other agents. Example:
   > For demo_project data locations and research history, read
-  > `/home/user/ResearchAtlas/projects/demo_project/knowledge/INDEX.md` before guessing paths or asking the user.
+  > `/home/user/.researchatlas/projects/demo_project/knowledge/INDEX.md` before guessing paths or asking the user.
 - One pointer line with the same message in the research repo's `AGENTS.md`, **only with the repo owner's
   approval**. This is the only edit the atlas makes outside its own folder. If the repo is shared, keep the line
   local (e.g. list the file in `.git/info/exclude`).

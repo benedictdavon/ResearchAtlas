@@ -13,7 +13,7 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
-from atlaslib.core import ATLAS_DIR, under
+from atlaslib.core import under
 from atlaslib.extract import cmd_extract
 from atlaslib.sources.copilot import _folder_path
 
@@ -77,11 +77,12 @@ def import_archive(archive, destination, project):
 def cmd_import_copilot(cfg, args):
     try:
         configured = cfg["sources"].get("copilot", {}).get("chat_storage")
-        expected = ATLAS_DIR / "work/copilot_import/workspaceStorage"
-        if not configured or Path(configured).resolve() != expected:
+        home = Path(cfg["home"])
+        expected = home / "work/copilot_import/workspaceStorage"
+        if not configured or Path(configured).resolve() != expected.resolve():
             raise ValueError(f"Set sources.copilot.chat_storage to {expected} before importing.")
-        if not expected.resolve().is_relative_to(ATLAS_DIR):
-            raise ValueError("The Copilot mirror must stay inside ResearchAtlas.")
+        if not expected.resolve().is_relative_to(home.resolve()):
+            raise ValueError("The Copilot mirror must stay inside the atlas home.")
         changed, unchanged = import_archive(args.archive, expected, cfg["project"])
         print(f"Copilot import: {changed} files installed, {unchanged} unchanged; existing history retained.")
         if args.extract:

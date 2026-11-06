@@ -1,7 +1,7 @@
 # 02 — Transcript Formats and Parsing Rules
 
 Generic, reusable facts about where coding agents store their transcripts, what the records look like, and
-which rules `atlas.py extract` implements. Code docstrings refer to the section names below
+which rules `researchatlas extract` implements. Code docstrings refer to the section names below
 (e.g. "docs/02: Transcript parsing rules", "docs/02: Tool inputs").
 
 These formats are **observed, not documented by the vendors**, and they change between versions. Codex CLI rollouts

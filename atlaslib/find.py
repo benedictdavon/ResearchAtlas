@@ -9,7 +9,7 @@ import os
 import re
 import sys
 
-from atlaslib.core import ATLAS_DIR, read_jsonl, work_paths
+from atlaslib.core import read_jsonl, work_paths
 
 FIND_WIDTH = 200  # max chars of one matched line shown
 LINES_PER_SECTION = 3  # best matching lines shown under a knowledge section
@@ -65,13 +65,13 @@ def score_lines(body, words):
     return full, partial
 
 
-def find_knowledge(kdir, words):
+def find_knowledge(kdir, words, home):
     """Ranked knowledge sections: (rank key, file label, start line, heading path, best lines)."""
     hits = []
     for md in sorted(kdir.glob("*.md")):
         with open(md, encoding="utf-8", errors="replace") as fh:
             lines = fh.readlines()
-        rel = os.path.relpath(md, ATLAS_DIR)
+        rel = os.path.relpath(md, home)
         for start, path, body in md_sections(lines):
             text = (" ".join(path) + "\n" + "".join(t + "\n" for _, t in body)).lower()
             if not all(w in text for w in words):
@@ -100,7 +100,7 @@ def find_paths(path, words):
     return hits
 
 
-def find_sessions(sdir, words):
+def find_sessions(sdir, words, home):
     """Condensed sessions with a message (### section) containing every word, most matching messages first.
     Each hit: (rank key, file label, title, n matching messages, (line no, text) of the best line)."""
     hits = []
@@ -123,7 +123,7 @@ def find_sessions(sdir, words):
                 msg = []
             msg.append((n, line.rstrip("\n")))
         if n_msgs:
-            rel = os.path.relpath(md, ATLAS_DIR)
+            rel = os.path.relpath(md, home)
             hits.append(((-n_full, -n_msgs, rel), rel, title, n_msgs, (best[1], best[2])))
     hits.sort(key=lambda h: h[0])
     return hits
@@ -141,9 +141,9 @@ def cmd_find(cfg, args):
         print("error: empty search term", file=sys.stderr)
         return 2
     wp = work_paths(cfg)
-    know = find_knowledge(cfg["project"]["knowledge_dir"], words)
+    know = find_knowledge(cfg["project"]["knowledge_dir"], words, cfg["home"])
     paths = find_paths(wp["paths"], words)
-    sess = find_sessions(wp["sessions_dir"], words)
+    sess = find_sessions(wp["sessions_dir"], words, cfg["home"])
     if not (know or paths or sess):
         print(
             f"No match for '{' '.join(args.term)}' in the atlas. "

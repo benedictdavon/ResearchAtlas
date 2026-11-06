@@ -220,3 +220,15 @@ the original project.
   design was kept; dumping the knowledge into context was not adopted.
 - **Lesson:** budget guards based on list-price estimates can undercount real billing. Use a lower cap and check
   actual billing.
+
+### D29 — Installable `researchatlas` CLI with an atlas home
+- **Alternatives:** keep running `python atlas.py` from a clone with `config.toml` next to the code; a full
+  `~/.config` + `~/.local/share` XDG split.
+- **Decision:** `pyproject.toml` installs a `researchatlas` command (also `python -m atlaslib`). Config, `work/` and
+  knowledge bases live in one *atlas home*: `$RESEARCHATLAS_HOME`, else the source checkout when run from one (so
+  `python atlas.py` keeps working unchanged), else `~/.researchatlas`. `researchatlas init` writes the bundled
+  template there and never overwrites. Relative paths in `config.toml` resolve against the folder holding it, and
+  every configured path may start with `~`.
+- **Why:** a pip install has no writable code folder to keep data next to, and one home folder is easier to back up,
+  version in a private repo and point agents at than an XDG split. The uploader (D24) runs `python -m atlaslib` from
+  the home, so it works with either layout.

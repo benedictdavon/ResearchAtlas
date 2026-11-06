@@ -294,7 +294,8 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(calls[0][:5], ["ssh", "-T", "-p", "2222", "-o"])
         self.assertEqual(calls[1][:4], ["scp", "-P", "2222", "-o"])
         self.assertIn("user@192.0.2.10:/atlas/work/copilot-upload-", calls[1][-1])
-        self.assertIn("import-copilot", calls[2][-1])
+        self.assertTrue(calls[2][-1].startswith("cd /atlas && /opt/conda/bin/python -m atlaslib --config config.toml "))
+        self.assertIn("import-copilot /atlas/work/copilot-upload-", calls[2][-1])
         self.assertTrue(calls[2][-1].endswith("--extract"))
         self.assertTrue(calls[3][-1].startswith("rm -f -- /atlas/work/copilot-upload-"))
         self.assertTrue(all(call.kwargs["check"] for call in run.call_args_list))
@@ -341,6 +342,7 @@ class SyncTests(unittest.TestCase):
         self.bundle()
         expected = self.tmp / "work/copilot_import/workspaceStorage"
         cfg = {
+            "home": self.tmp,
             "sources": {
                 "copilot": {"chat_storage": str(expected)},
                 "codex_sessions": str(self.tmp / "absent-codex"),
@@ -363,9 +365,8 @@ class SyncTests(unittest.TestCase):
                 "subagent_result": 3000,
             },
         }
-        with mock.patch.object(copilot_import, "ATLAS_DIR", self.tmp):
-            with contextlib.redirect_stdout(io.StringIO()):
-                code = copilot_import.cmd_import_copilot(cfg, SimpleNamespace(archive=self.archive, extract=True))
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = copilot_import.cmd_import_copilot(cfg, SimpleNamespace(archive=self.archive, extract=True))
         self.assertEqual(code, 0)
         work = cfg["project"]["work_dir"]
         row = json.loads((work / "sessions.jsonl").read_text())

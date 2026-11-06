@@ -1,6 +1,6 @@
 """refresh: run extract + paths, then report sessions to review, broken cited paths, and new uncited paths.
 
-refresh only reports. Sessions become "reviewed" through `atlas.py mark-reviewed` (review ledger, D25).
+refresh only reports. Sessions become "reviewed" through `researchatlas mark-reviewed` (review ledger, D25).
 """
 
 import argparse
@@ -11,7 +11,7 @@ import re
 import time
 from collections import Counter
 
-from atlaslib.core import ATLAS_DIR, read_jsonl, work_paths
+from atlaslib.core import read_jsonl, work_paths
 from atlaslib.extract import cmd_extract
 from atlaslib.paths import _paths_now_iso, cmd_paths, verify_paths
 from atlaslib.review import condensed_file, load_ledger, pending_sessions, session_key
@@ -24,7 +24,7 @@ FREQ_SKIP_PARTS = {".agents", ".git", "__pycache__"}  # path components never re
 FREQ_SKIP_NAMES = {"SKILL.md"}
 
 # Atlas feedback (D25): a pending session that consulted the atlas and says something in it is wrong or stale.
-ATLAS_USED_RE = re.compile(r"ResearchAtlas/projects/|atlas\.py find", re.I)
+ATLAS_USED_RE = re.compile(r"ResearchAtlas/projects/|(?:atlas\.py|researchatlas|-m atlaslib) find", re.I)
 ATLAS_WORD_RE = re.compile(r"atlas", re.I)  # also "ResearchAtlas"
 ATLAS_CORRECTION_RE = re.compile(
     r"\b(?:differ\w*|stale|outdated|out of date|wrong|incorrect|inaccurate|newer than|mismatch\w*|"
@@ -123,7 +123,7 @@ def new_frequent_paths(rows, cited, roots, min_sessions, old_paths):
     return len(out), out[:FREQ_CAP]
 
 
-def print_sessions(title, items):
+def print_sessions(title, items, home=None):
     """One line per session; `sha=` is what mark-reviewed --report records (docs/REFRESH.md step 5)."""
     print(f"{title}: {len(items)}")
     for rec, sha, size, row in items:
@@ -140,7 +140,7 @@ def print_sessions(title, items):
             f"  {rec['source']}:{rec['short_id']}  {start}  {rec['kind']}  sha={sha or '-'}  "
             f"{rec.get('title') or '(no title)'}{extra}"
         )
-        print(f"      {condensed_file(rec) or '(no condensed file)'}")
+        print(f"      {condensed_file(rec, home) or '(no condensed file)'}")
 
 
 def atlas_feedback(path):
@@ -169,11 +169,11 @@ def cmd_refresh(cfg, args):
         return 1
     index = list(read_jsonl(wp["sessions_index"]))
     ledger_path = cfg["project"]["review_ledger"]
-    new, changed = pending_sessions(index, load_ledger(ledger_path))
+    new, changed = pending_sessions(index, load_ledger(ledger_path), cfg["home"])
     print(
         f"extract: {len(index)} sessions indexed; {len(index) - len(new) - len(changed)} reviewed, "
         f"{len(new)} new, {len(changed)} changed since review "
-        f"(ledger {os.path.relpath(ledger_path, ATLAS_DIR)})"
+        f"(ledger {os.path.relpath(ledger_path, cfg['home'])})"
     )
 
     old_paths = {r["path"] for r in read_jsonl(wp["paths"])} if wp["paths"].exists() else None
@@ -188,17 +188,17 @@ def cmd_refresh(cfg, args):
     print()
 
     # Step 3a: sessions to review, then atlas feedback found in them.
-    print_sessions("New sessions (not reviewed)", new)
-    print_sessions("Changed since review (condensed text differs)", changed)
+    print_sessions("New sessions (not reviewed)", new, cfg["home"])
+    print_sessions("Changed since review (condensed text differs)", changed, cfg["home"])
     print()
-    feedback = [(rec, atlas_feedback(condensed_file(rec))) for rec, *_ in new + changed]
+    feedback = [(rec, atlas_feedback(condensed_file(rec, cfg["home"]))) for rec, *_ in new + changed]
     feedback = [(rec, hits) for rec, hits in feedback if hits]
     print(
         f"Atlas feedback in these sessions (consulted the atlas, then called something in it wrong or stale; "
         f"check first): {len(feedback)}"
     )
     for rec, hits in feedback:
-        print(f"  {session_key(rec)}  {os.path.relpath(condensed_file(rec), ATLAS_DIR)}")
+        print(f"  {session_key(rec)}  {os.path.relpath(condensed_file(rec, cfg['home']), cfg['home'])}")
         for n, text in hits[:FEEDBACK_CAP]:
             print(f"      :{n}  {text}")
         if len(hits) > FEEDBACK_CAP:
@@ -239,6 +239,6 @@ def cmd_refresh(cfg, args):
     print()
     print(
         f"Next: update {cfg['project']['knowledge_dir']}/ from this report (docs/prompts/incremental_update.md), "
-        "then: atlas.py mark-reviewed --report <this report>"
+        "then: researchatlas mark-reviewed --report <this report>"
     )
     return 0

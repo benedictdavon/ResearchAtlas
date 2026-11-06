@@ -3,7 +3,7 @@
 Only synthetic fixtures written to temporary directories are used. Nothing under the real Copilot, workspaceStorage or
 ResearchAtlas folders is read.
 
-Run: /opt/conda/bin/python -m unittest discover -s tests
+Run: python -m unittest discover -s tests
 """
 
 import contextlib

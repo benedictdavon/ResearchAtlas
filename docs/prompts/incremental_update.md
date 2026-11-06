@@ -1,6 +1,6 @@
-# Incremental update prompt (after `atlas.py refresh`)
+# Incremental update prompt (after `researchatlas refresh`)
 
-Used for step 3 of `docs/REFRESH.md`. The user starts an agent in the atlas folder and says:
+Used for step 3 of `docs/REFRESH.md`. The user starts an agent in the atlas home and says:
 "Follow `docs/prompts/incremental_update.md` with the report `work/<project>/refresh_<YYYYMMDD>.txt`."
 
 Below, `<project>` is `[project].name` from `config.toml`, the knowledge folder is `projects/<project>/knowledge/`
@@ -18,7 +18,7 @@ You are updating the ResearchAtlas knowledge files from a refresh report.
 Open the other knowledge files when you need them. Don't read the whole docs set.
 
 **Rules**
-- Read-only outside the atlas folder. Never modify the research repo, data mounts, related repos or databases, even to
+- Read-only outside the atlas home. Never modify the research repo, data mounts, related repos or databases, even to
   "fix" a path.
 - Sessions are leads, not truth. When a session reports a result, check the experiment folder's own files.
   - Typical files: `README.md`, `RESULTS.md`, `FINDINGS.md`, `REPORT.md`, experiment logs, result JSON files.
@@ -60,15 +60,15 @@ Open the other knowledge files when you need them. Don't read the whole docs set
 5. **New uncited paths** from the report: add only those that belong to a dataset or experiment you're documenting.
    Ignore caches, `__pycache__`, scratch files.
 6. **Verify.**
-   - Run `python atlas.py refresh > work/<project>/check.txt` (it changes no review state). "Cited paths no longer
+   - Run `researchatlas refresh > work/<project>/check.txt` (it changes no review state). "Cited paths no longer
      OK" must be 0, or only paths you marked `✗`.
-   - Spot-check with `python atlas.py find <new topic>`.
+   - Spot-check with `researchatlas find <new topic>`.
 7. **Report to the user.**
    - Sessions covered, by topic. The main knowledge changes, especially superseded results.
    - Paths fixed. Questions added.
    - Sessions you skipped and why (e.g. no research content).
    - Commit only when asked.
-8. **Mark reviewed.** `python atlas.py mark-reviewed --report <the report>`. Sessions you skipped on purpose are
+8. **Mark reviewed.** `researchatlas mark-reviewed --report <the report>`. Sessions you skipped on purpose are
    marked too; say so in your report. If you could not finish some, mark only the finished ones by id
    (`mark-reviewed --report <report> <id> … --note "…"`). Always mark against the supplied report, even if sessions
    grew during your work: their newer content then stays pending for the next refresh (D25).

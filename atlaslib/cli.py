@@ -1,6 +1,7 @@
 """ResearchAtlas CLI: mine agent transcripts into a verified research knowledge base.
 
 Subcommands (see docs/04_mvp_spec.md):
+  init      create a config.toml in the atlas home from the bundled template
   extract   condensed per-session markdown + sessions.jsonl + per-session path hits
   import-copilot  receive a selective PC chat archive; optionally run extract
   paths     aggregate path hits into paths.jsonl and verify each path (timeout-guarded)
@@ -9,13 +10,18 @@ Subcommands (see docs/04_mvp_spec.md):
   mark-reviewed  record sessions as covered by knowledge/ in the review ledger (D25)
   find      search knowledge/ (by section), paths.jsonl and condensed sessions
 
-Stdlib only. Run with /opt/conda/bin/python (3.11).
+Stdlib only; Python 3.11+. The atlas home holds config.toml, work/ and the knowledge base: $RESEARCHATLAS_HOME,
+else the source checkout when run from one, else ~/.researchatlas.
 """
 
 import argparse
+import sys
+from importlib import resources
+from pathlib import Path
 
+from atlaslib import __version__
 from atlaslib.copilot_import import cmd_import_copilot
-from atlaslib.core import load_config
+from atlaslib.core import HOME_ENV, ConfigError, default_home, load_config
 from atlaslib.extract import cmd_extract
 from atlaslib.find import cmd_find
 from atlaslib.paths import cmd_paths
@@ -23,10 +29,29 @@ from atlaslib.refresh import cmd_refresh
 from atlaslib.review import cmd_mark_reviewed
 
 
+def cmd_init(args):
+    """Copy the bundled config template into the atlas home; never overwrite an existing config."""
+    home = Path(args.home).expanduser() if args.home else default_home()
+    dest = home / "config.toml"
+    if dest.exists():
+        print(f"{dest} already exists; leaving it unchanged.")
+        return 0
+    home.mkdir(parents=True, exist_ok=True)
+    dest.write_text(resources.files("atlaslib").joinpath("config.example.toml").read_text())
+    print(f"Wrote {dest}. Edit its source and project paths, then run `researchatlas refresh`.")
+    if home.resolve() != default_home().resolve():
+        print(f"This is not the default home: set {HOME_ENV}={home} or pass --config {dest}.")
+    return 0
+
+
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="atlas.py", description=__doc__.splitlines()[0])
-    ap.add_argument("--config", help="path to config.toml (default: next to atlas.py)")
+    ap = argparse.ArgumentParser(prog="researchatlas", description=__doc__.splitlines()[0])
+    ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    ap.add_argument("--config", help="path to config.toml (default: <atlas home>/config.toml)")
     sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("init", help="create config.toml in the atlas home from the bundled template")
+    p.add_argument("--home", help="folder to initialise (default: the atlas home)")
 
     p = sub.add_parser("extract", help="condense transcripts into work/<project>/sessions/")
     p.add_argument("--force", action="store_true", help="re-extract even if raw file is unchanged")
@@ -76,5 +101,11 @@ def main(argv=None):
     p.set_defaults(func=cmd_find)
 
     args = ap.parse_args(argv)
-    cfg = load_config(args.config)
+    if args.cmd == "init":
+        return cmd_init(args)
+    try:
+        cfg = load_config(args.config)
+    except ConfigError as exc:
+        print(f"researchatlas: {exc}", file=sys.stderr)
+        return 2
     return args.func(cfg, args) or 0

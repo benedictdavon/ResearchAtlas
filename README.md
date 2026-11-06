@@ -20,17 +20,17 @@ Principles:
 
 ```
 Codex / Claude Code / Copilot transcripts
-        │  atlas.py extract    select sessions for your project, condense them, harvest absolute paths
+        │  researchatlas extract   select sessions for your project, condense them, harvest absolute paths
         ▼
 work/<project>/sessions/*.md   + sessions.jsonl + per-session path hits
-        │  atlas.py paths      aggregate paths, verify each on disk (with timeouts)
+        │  researchatlas paths     aggregate paths, verify each on disk (with timeouts)
         ▼
 work/<project>/paths.jsonl
         │  synthesis (an agent, guided by docs/prompts/)  →  curated, cited knowledge
         ▼
 projects/<project>/knowledge/INDEX.md, datasets.md, experiments.md, decisions.md, ...
-        │  atlas.py refresh / mark-reviewed   incremental updates as new sessions arrive
-        │  atlas.py find <words>              agents search knowledge, paths and sessions
+        │  researchatlas refresh / mark-reviewed   incremental updates as new sessions arrive
+        │  researchatlas find <words>              agents search knowledge, paths and sessions
 ```
 
 The deterministic steps (`extract`, `paths`, `refresh`, `find`) use no LLM. Writing `knowledge/` is done by a coding
@@ -39,20 +39,24 @@ agent following the prompts in [docs/prompts/](docs/prompts/), and every claim m
 ## Quick start
 
 ```bash
-git clone https://github.com/benedictdavon/ResearchAtlas.git && cd ResearchAtlas
-cp config.example.toml config.toml        # then edit: transcript locations, project roots, data mounts
-python3 atlas.py extract                  # condense + index matching sessions into work/
-python3 atlas.py paths                    # verify harvested paths → work/<project>/paths.jsonl
-python3 atlas.py find "dataset" "train"   # search (all words in one section / path / message)
+pip install git+https://github.com/benedictdavon/ResearchAtlas.git   # Python 3.11+, no dependencies
+researchatlas init                        # writes ~/.researchatlas/config.toml (or $RESEARCHATLAS_HOME)
+$EDITOR ~/.researchatlas/config.toml      # transcript locations, project roots, data mounts
+researchatlas extract                     # condense + index matching sessions into work/
+researchatlas paths                       # verify harvested paths → work/<project>/paths.jsonl
+researchatlas find "dataset" "train"      # search (all words in one section / path / message)
 ```
 
-Then have an agent write `projects/<project>/knowledge/` from the condensed sessions and verified paths. The format
+Working from a clone instead? `python atlas.py <command>` runs the same CLI, and the checkout itself is the atlas
+home, so `config.toml`, `work/` and `projects/` sit next to the code (all gitignored).
+
+Then have an agent write `projects/<project>/knowledge/` in the atlas home from the condensed sessions and verified paths. The format
 and rules are in [docs/04_mvp_spec.md](docs/04_mvp_spec.md) §3. Once the knowledge exists, keep it current:
 
 ```bash
-python3 atlas.py refresh | tee work/<project>/refresh_$(date +%Y%m%d).txt   # sessions to review, broken cited paths, new paths
+researchatlas refresh | tee work/<project>/refresh_$(date +%Y%m%d).txt   # sessions to review, broken cited paths, new paths
 # an agent applies the report to knowledge/ (docs/prompts/incremental_update.md), then:
-python3 atlas.py mark-reviewed --report work/<project>/refresh_<YYYYMMDD>.txt
+researchatlas mark-reviewed --report work/<project>/refresh_<YYYYMMDD>.txt
 ```
 
 See [docs/REFRESH.md](docs/REFRESH.md) for the full workflow.
@@ -64,19 +68,19 @@ repo's `AGENTS.md`:
 
 ```markdown
 For <project> data locations and research history, read
-/path/to/ResearchAtlas/projects/<project>/knowledge/INDEX.md before guessing paths or asking the user.
-Search with: python3 /path/to/ResearchAtlas/atlas.py find <words>
+~/.researchatlas/projects/<project>/knowledge/INDEX.md before guessing paths or asking the user.
+Search with: researchatlas find <words>
 ```
 
 ### Copilot chats from a Windows PC (optional)
 
 VS Code Chat logs live on the client machine. [tools/copilot_sync.py](tools/copilot_sync.py) (Python 3.9+, stdlib)
 previews and uploads only the chat logs of the workspaces under `--root` over SSH. The server side receives them
-with `atlas.py import-copilot`. Preview is the default:
+with `researchatlas import-copilot`. Preview is the default:
 
 ```bash
 python tools/copilot_sync.py --root /home/user/research/demo_project
-python tools/copilot_sync.py --root /home/user/research/demo_project --upload --host user@server --atlas-dir /home/user/ResearchAtlas
+python tools/copilot_sync.py --root /home/user/research/demo_project --upload --host user@server --atlas-dir /home/user/.researchatlas
 ```
 
 ## Does it help? (benchmark summary)
@@ -113,11 +117,12 @@ These numbers are from one project with 9 questions, so treat them as indicative
 
 | Path | What |
 |---|---|
-| `atlas.py`, `atlaslib/` | CLI and library: `sources/` (Codex, Claude Code, Copilot parsers), `extract`, `paths`, `refresh`, `review`, `find` |
+| `atlaslib/` | CLI and library: `sources/` (Codex, Claude Code, Copilot parsers), `extract`, `paths`, `refresh`, `review`, `find` |
 | `tools/copilot_sync.py` | Client-side Copilot chat uploader |
-| `tests/` | Unit tests on synthetic transcripts: `python3 -m unittest discover -s tests` |
+| `atlas.py` | Runs the CLI from a source checkout |
+| `tests/` | Unit tests on synthetic transcripts: `python -m unittest discover -s tests` |
 | `docs/` | Transcript formats, design decisions, spec, refresh guide, agent prompts ([index](docs/README.md)) |
-| `config.example.toml` | Template for your `config.toml` (gitignored) |
+| `atlaslib/config.example.toml` | Template that `researchatlas init` copies to `config.toml` |
 | `work/`, `projects/` | Generated intermediates and your knowledge bases. Both are gitignored here: they contain your private research |
 
 ## License

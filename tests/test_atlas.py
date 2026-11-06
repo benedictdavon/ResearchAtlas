@@ -1,13 +1,13 @@
-"""Regression tests for atlas.py: the documented parsing, selection, path and citation rules.
+"""Regression tests for ResearchAtlas: the documented parsing, selection, path and citation rules.
 
 The spec is docs/02_transcript_formats.md ("Transcript parsing rules", "Extraction and path facts"),
 docs/03_decisions.md (D15-D20) and docs/04_mvp_spec.md (sections 1-5). Tests describe those rules.
-They don't snapshot what atlas.py happens to do.
+They don't snapshot what the code happens to do.
 
 Only synthetic transcripts in temporary directories are used. Nothing under ~/.codex, ~/.claude,
 /mnt, work/ or the real knowledge files is read.
 
-Run: cd /home/user/ResearchAtlas && /opt/conda/bin/python -m unittest discover -s tests -v
+Run from the repository root: python -m unittest discover -s tests -v
 """
 
 import contextlib
@@ -1240,6 +1240,11 @@ class AtlasFeedbackTests(unittest.TestCase):
             "The pilot import works.\n"
         )
         self.assertEqual(hits, ["Three Atlas recording IDs differ from the actual CSV import keys."])
+
+    def test_installed_cli_and_home_count_as_reading_the_atlas(self):
+        for used in ("- `$ researchatlas find sensor`", "- `$ cat ~/.researchatlas/projects/p/knowledge/INDEX.md`"):
+            hits = self.feedback(f"{used}\nThe atlas entry for the sensor rig is outdated.\n")
+            self.assertEqual(hits, ["The atlas entry for the sensor rig is outdated."], used)
 
     def test_session_that_never_read_the_atlas_reports_nothing(self):
         self.assertEqual(self.feedback("The atlas is outdated, someone said.\n"), [])

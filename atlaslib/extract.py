@@ -7,7 +7,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from atlaslib.core import ATLAS_DIR, _iso, collapse_ws, path_regex, read_jsonl, under, work_paths, write_jsonl
+from atlaslib.core import _iso, collapse_ws, path_regex, read_jsonl, under, work_paths, write_jsonl
 from atlaslib.sources import SOURCES
 
 
@@ -75,11 +75,11 @@ def fresh(rec, c):
     return rec.get("raw_size") == c["size"] and rec.get("raw_mtime") == c["mtime"]
 
 
-def outputs_exist(rec, pathhits_dir, atlas_dir):
+def outputs_exist(rec, pathhits_dir, home):
     """Both per-session outputs exist (condensed only if the record has one)."""
     ph = pathhits_dir / f"{rec['source']}_{rec['short_id']}.json"
     cp = rec.get("condensed_path")
-    return ph.exists() and (cp is None or (atlas_dir / cp).exists())
+    return ph.exists() and (cp is None or (home / cp).exists())
 
 
 def parse_candidate(c, ctx):
@@ -144,7 +144,7 @@ def finalize(c, st, sel_by, ctx):
     if st["n_text"] > 0:
         out = ctx["sessions_dir"] / f"{c['source']}_{c['short']}.md"
         write_condensed(c, st, title, out, cwd, cli)
-        condensed = os.path.relpath(out, ATLAS_DIR)
+        condensed = os.path.relpath(out, ctx["home"])
     if st["body"].exists():
         os.remove(st["body"])
     write_pathhits(c, st, ctx["pathhits_dir"])
@@ -182,6 +182,7 @@ def cmd_extract(cfg, args):
     t0 = time.time()
     wp = work_paths(cfg)
     ctx = {
+        "home": cfg["home"],
         "sessions_dir": wp["sessions_dir"],
         "pathhits_dir": wp["pathhits_dir"],
         "rx": path_regex(cfg["paths"]["roots"]),
@@ -214,7 +215,7 @@ def cmd_extract(cfg, args):
             and pr
             and pr.get("selected_by") == "mention"
             and fresh(pr, c)
-            and outputs_exist(pr, ctx["pathhits_dir"], ATLAS_DIR)
+            and outputs_exist(pr, ctx["pathhits_dir"], ctx["home"])
         ):
             sel[key] = "mention"
             continue
@@ -252,7 +253,7 @@ def cmd_extract(cfg, args):
             and not args.force
             and pr
             and fresh(pr, c)
-            and outputs_exist(pr, ctx["pathhits_dir"], ATLAS_DIR)
+            and outputs_exist(pr, ctx["pathhits_dir"], ctx["home"])
         ):
             rec = dict(pr)
             rec["selected_by"] = sb
@@ -301,7 +302,7 @@ def cmd_extract(cfg, args):
         f"errors {len(errors)}"
     )
     raw_mb = sum(r["raw_size"] for r in rows) / 1048576
-    cond = [ATLAS_DIR / r["condensed_path"] for r in rows if r["condensed_path"]]
+    cond = [cfg["home"] / r["condensed_path"] for r in rows if r["condensed_path"]]
     cond_mb = sum(p.stat().st_size for p in cond) / 1048576
     print(f"raw {raw_mb:.1f} MB (selected) vs condensed {cond_mb:.2f} MB in {len(cond)} files")
     all_paths = set()
