@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Benchmark results for smaller models (Claude Haiku 5.5 and gpt-6-luna) in the benchmark report.
+
+### Changed
+- Benchmark report: a note on a possibly wrong item in one answer key, and a gap found in the first run's isolation.
+
 ## [0.1.0] - 2026-11-06
 
 First public release.

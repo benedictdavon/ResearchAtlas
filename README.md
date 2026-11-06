@@ -192,9 +192,13 @@ Ratios are relative to `none`: the geometric mean over questions, with bootstrap
 - Dumping the whole knowledge base into context gave similar quality at 1.6–3.7× the tokens.
 - A folder hint did not substitute for the atlas.
 
+A follow-up with smaller models (Claude Haiku 5.5 and gpt-6-luna, `none` and `atlas` arms only) showed a larger
+quality gain: pass rates rose from 17/27 to 26/27 for both agents, at 0.55× and 0.37× the tokens, and cost per
+passing answer fell to $0.05 and $0.02.
+
 These numbers are from one project with 9 questions, so treat them as indicative. The benchmark cost $91.54 in
-API spend; the [report](docs/benchmark.md) has the questions, isolation, grading, per-question results and
-limitations.
+API spend and the follow-up $5.67; the [report](docs/benchmark.md) has the questions, isolation, grading,
+per-question results and limitations.
 
 ## Scope
 

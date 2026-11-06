@@ -1,8 +1,8 @@
 # Benchmark
 
 Does pointing a coding agent at the atlas help, and what does it cost? This page reports a controlled comparison run
-on 2026-11-02 on the research project ResearchAtlas was built for ([background.md](background.md)). Design
-decision: D28.
+on 2026-11-02 on the research project ResearchAtlas was built for ([background.md](background.md)), and a
+follow-up on 2026-11-06 with smaller models ([Smaller models](#smaller-models)). Design decision: D28.
 
 ## Summary
 
@@ -17,6 +17,8 @@ decision: D28.
   first gave similar quality at 1.6× (Claude Code) and 3.7× (Codex) the tokens.
 - **A folder hint is no substitute.** A user-style hint about where to look left token use about the same and, for
   Codex, lowered the pass rate.
+- **Smaller models gain more.** Rerun with Claude Haiku 5.5 and gpt-6-luna, the atlas raised pass rates from 17/27
+  to 26/27 for both agents, at 0.55× and 0.37× the tokens. Cost per passing answer was $0.05 and $0.02.
 
 The evidence comes from one project and 9 questions, so treat it as indicative ([limitations](#limitations)).
 
@@ -170,9 +172,99 @@ real.
 All control runs passed. Claude Code's `dump` runs didn't open the knowledge files for these questions; Codex
 skipped them on C1 but read them all on C2 (472k tokens instead of 79k).
 
+## Smaller models
+
+Coding agents often hand implementation work to a cheaper model. On 2026-11-06 the `none` and `atlas` arms were
+rerun with two such models to see whether the atlas still helps when the agent itself is weaker.
+
+### What changed
+
+| | Claude Code | Codex |
+|---|---|---|
+| Version | 2.1.308 | codex-cli 0.166.0 |
+| Model | Claude Haiku 5.5, effort high | gpt-6-luna, effort max |
+| Repetitions | 3 for `none` and `atlas` | 3 for `none` and `atlas` |
+| Scored runs | 66 | 66 |
+
+- Same questions, sandbox, metrics and grading protocol, with a fresh set of blind graders. No run timed out,
+  spawned a subagent or made a critical error.
+- The knowledge base had grown to 332 KB through regular refreshes (256 KB on 2026-11-02).
+- A3 was re-keyed. The month's recordings were imported into the database between the two runs, so its status item
+  now asks for the rows that exist. See [the note on A3](#note-on-a3) for what this means for the first run.
+- Two more paths were hidden in every arm. Claude Code's paste cache (`~/.claude/paste-cache/`) held an old
+  acceptance-test plan that included A6's expected answer, and a new notes folder quoted the atlas. Three Claude
+  Code `none` runs of A6 found the plan before it was hidden; they were discarded and rerun.
+
+### Results
+
+Research questions (A1 to T2). Claude Code costs are computed from tokens at billed prices; Codex costs are
+list-price estimates scaled to the bill (see [Spend](#spend)).
+
+| Agent | Arm | Runs | Pass | Mean score | Median tokens | Mean cost per run | Cost per pass | Median wall time |
+|---|---|---|---|---|---|---|---|---|
+| Claude Code | `none` | 27 | 17/27 | 0.79 | 507k | $0.080 | $0.127 | 115 s |
+| Claude Code | **`atlas`** | 27 | **26/27** | **0.96** | **295k** | **$0.049** | **$0.051** | **74 s** |
+| Codex | `none` | 27 | 17/27 | 0.81 | 421k | $0.046 | $0.073 | 176 s |
+| Codex | **`atlas`** | 27 | **26/27** | **0.95** | **157k** | **$0.018** | **$0.019** | **89 s** |
+
+Relative to `none` (geometric mean over questions, bootstrap 95% CI):
+
+| Agent | Tokens | Cost | Wall time | Score difference |
+|---|---|---|---|---|
+| Claude Code | **0.55** (0.42–0.71) | **0.63** (0.50–0.77) | **0.58** (0.43–0.79) | +0.17 (+0.03 to +0.33) |
+| Codex | **0.37** (0.26–0.51) | **0.48** (0.37–0.60) | **0.52** (0.39–0.67) | +0.14 (+0.05 to +0.23) |
+
+Median tokens (thousands) / mean score:
+
+| Question | Claude `none` | Claude `atlas` | Codex `none` | Codex `atlas` |
+|---|---|---|---|---|
+| A1 retrieval | 517 / 0.44 | 399 / 0.89 | 683 / 0.67 | 229 / 1.00 |
+| A2 retrieval | 942 / 0.52 | 203 / 1.00 | 1566 / 0.86 | 228 / 1.00 |
+| A3 retrieval | 244 / 0.33 | 99 / 0.87 | 113 / 0.20 | 95 / 0.53 |
+| A4 retrieval | 807 / 0.83 | 329 / 1.00 | 333 / 0.83 | 165 / 1.00 |
+| A5a retrieval | 442 / 1.00 | 178 / 1.00 | 1082 / 1.00 | 276 / 1.00 |
+| A5b retrieval | 345 / 1.00 | 412 / 0.92 | 281 / 0.75 | 109 / 1.00 |
+| A6 negative | 585 / 1.00 | 329 / 1.00 | 433 / 1.00 | 136 / 1.00 |
+| T1 task | 292 / 1.00 | 282 / 1.00 | 270 / 1.00 | 141 / 1.00 |
+| T2 task | 557 / 1.00 | 263 / 1.00 | 244 / 1.00 | 96 / 1.00 |
+
+- **The quality gain is larger than with the frontier models**, and both confidence intervals exclude zero. Without
+  the atlas the smaller models missed more of the research history (A1 to A4); with it they passed about as often
+  as the frontier models did.
+- **Token savings are similar** (0.55× and 0.37×, against 0.49× and 0.42×). The atlas used fewer tokens on every
+  question except Claude Code's A5b.
+- **The weakest cell is Codex `atlas` on A3** (0.53): two answers left out how the month's recordings differ from
+  earlier ones, and one named only the parent export folder.
+- **Controls:** all 24 control runs passed. Tokens with the pointer were 0.94× (0.86–1.02) for Claude Code and
+  1.04× (1.01–1.06) for Codex, a small overhead on base sizes of 13k (C1) and 70k (C2) tokens.
+
+### Across model tiers
+
+Pass rate and cost per pass on the research questions:
+
+| Agent | Model | `none` | `atlas` |
+|---|---|---|---|
+| Claude Code | Claude Opus 5.5 | 20/27, $0.49 | 26/27, $0.24 |
+| Claude Code | Claude Haiku 5.5 | 17/27, $0.13 | 26/27, $0.05 |
+| Codex | gpt-6.1-sol | 13/15, $0.44 | 15/15, $0.22 |
+| Codex | gpt-6-luna | 17/27, $0.07 | 26/27, $0.02 |
+
+With the atlas, the smaller models passed about as often as the frontier models did with it, at a fifth (Claude
+Code) and a tenth (Codex) of the cost per pass, and more often than the frontier models without it. Read this
+comparison loosely: the runs are four days apart, the knowledge base had grown, A3 was re-keyed, the Codex CLI was
+newer and the graders were different.
+
+### Note on A3
+
+The re-check for the follow-up showed that the first run's A3 key may have been partly wrong. It expected "not yet in
+the database", but some of the month's rows came from an earlier, partial import whose date can't be established,
+so they may already have existed on 2026-11-02. No A3 answer in the first run made a critical error. If the status
+item is dropped from the first run, Codex `atlas` passes 14/15 instead of 15/15 and Codex `dump` 11/13 instead of
+12/13; mean scores change by at most 0.02 and no other pass count changes.
+
 ## Spend
 
-Billed for the whole benchmark, including the discarded pilot and setup probes:
+Billed for the first run (2026-11-02), including the discarded pilot and setup probes:
 
 | Model | Requests | Billed |
 |---|---|---|
@@ -188,17 +280,38 @@ estimates scaled by 2.36. Ratios don't depend on this if prices scale uniformly.
 component, the Codex `atlas` cost ratio would be 0.49×, 0.64× or 0.53×, and `dump` 3.19×, 2.21× or 1.85×; the
 conclusions hold in every case. Lesson: cap budgets on billed spend, not on list-price estimates.
 
+The smaller-model follow-up (2026-11-06), including the three discarded runs:
+
+| Model | Runs | Billed |
+|---|---|---|
+| Claude Haiku 5.5 (Claude Code) | 69 | $3.88 (Claude Code reported $0.90) |
+| gpt-6-luna (Codex) | 66 | $1.78 (list-price estimate $0.90) |
+| **Total** | | **$5.67** |
+
+Neither CLI's figure was usable this time. Claude Code's reported cost was 4.3× below the bill: its Haiku 5.5 prices
+appear to be out of date. The bill matches the recorded tokens exactly at $0.50 input, $0.05 cache read, $0.625
+cache write and $2.50 output per million tokens, so the Claude Code costs in [Smaller models](#smaller-models) use
+those prices. The Codex estimate was 1.98× below the bill, and the Codex costs are scaled by that factor. Grading
+isn't included in either total.
+
 ## Limitations
 
-- **One project, 9 questions.** Confidence intervals resample questions and are wide. The token result holds on
-  every question for both agents; the quality result doesn't.
+- **One project, 9 questions.** Confidence intervals resample questions and are wide. In the first run the token
+  result holds on every question for both agents; the quality result doesn't.
 - **Possible rubric bias.** Rubric items were written from verified facts, but some phrasings (such as "not yet in
   the database") match how the atlas words them. This may favour `atlas` and `dump` on quality; it doesn't affect
-  tokens.
+  tokens. That item was also possibly wrong ([note on A3](#note-on-a3)).
 - **Imperfect blinding.** Answers that cite the atlas reveal their arm. Graders were told to ignore sources.
-- **Ceiling effect.** Codex without the atlas already passed 13/15, which leaves little room to show a quality gain.
-- **Estimated Codex costs** (see [Spend](#spend)); Claude Code costs are as reported and billed.
+- **Ceiling effect.** In the first run, Codex without the atlas already passed 13/15, which leaves little room to
+  show a quality gain. The smaller models had more room.
+- **Derived costs** (see [Spend](#spend)). Codex costs are estimates scaled to the bill. Claude Code costs are as
+  reported in the first run and recomputed from tokens in the follow-up.
 - **Tool calls aren't comparable across agents.** Codex batches several commands into one call.
 - **One contaminated run.** One Codex `none` run listed the hidden, empty atlas folder; nothing could leak from it.
+- **A gap in the first run's isolation.** One Claude Code `none` run of A6 found the old acceptance-test plan in
+  Claude Code's paste cache, which included A6's expected answer. A6 scored 1.00 in every arm of both runs, so no
+  result changes; the cache was hidden for the follow-up.
+- **Scoring takes the final message only.** One Claude Haiku `none` run gave its answer in an earlier message and
+  ended with a short note, so it scored 0. The first run used the same rule.
 - **Not reproducible as published.** The harness and questions refer to private research data, so they are not
   part of this repository.

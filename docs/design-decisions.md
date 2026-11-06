@@ -218,8 +218,10 @@ the original project.
   - A hard spending cap per agent.
 - **Outcome:** the pointer arm used clearly fewer tokens than `none` with equal or better grades, so the pointer
   design was kept; dumping the knowledge into context was not adopted.
-- **Lesson:** budget guards based on list-price estimates can undercount real billing. Use a lower cap and check
-  actual billing.
+- **Follow-up (2026-11-06):** the `none` and `atlas` arms rerun with smaller models (Claude Haiku 5.5,
+  gpt-6-luna). The atlas raised their pass rates more than the frontier models', at similar token savings.
+- **Lesson:** budget guards based on list-price estimates, or on the CLI's own cost figure, can undercount real
+  billing. Use a lower cap and check actual billing.
 - **Report:** [benchmark.md](benchmark.md).
 
 ### D29 — Installable `researchatlas` CLI with an atlas home
