@@ -1,0 +1,35 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Please redact private paths and transcript content before posting. Don't attach real transcripts;
+        a minimal synthetic record that reproduces the problem is ideal.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Full output of the command (redacted).
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "`researchatlas --version`, `python --version`, and the agent and version (e.g. Claude Code 2.0.1)."
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Transcript source
+      multiple: true
+      options: [OpenAI Codex CLI, Claude Code, GitHub Copilot (VS Code Chat), GitHub Copilot (agent), Not source-specific]
