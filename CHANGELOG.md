@@ -10,7 +10,8 @@ All notable changes to this project are documented here. The format follows
 - Benchmark results for smaller models (Claude Haiku 5.5 and gpt-6-luna) in the benchmark report.
 
 ### Changed
-- Benchmark report: a note on a possibly wrong item in one answer key, and a gap found in the first run's isolation.
+- Benchmark report: corrected the first run's answer key for A3's database status and regraded that item; excluded
+  one run that saw an expected answer. Figures updated.
 
 ## [0.1.0] - 2026-11-06
 

@@ -8,9 +8,9 @@ follow-up on 2026-11-06 with smaller models ([Smaller models](#smaller-models)).
 
 - **Fewer tokens, less time, same or better answers.** On 9 research questions, runs with the atlas pointer used
   **0.49×** (Claude Code) and **0.42×** (Codex) the tokens of runs without it, and finished in less than half the
-  wall time. Pass rates rose from 20/27 to 26/27 (Claude Code) and from 13/15 to 15/15 (Codex).
-- **Cheaper per correct answer.** Cost per passing answer fell from $0.49 to $0.24 (Claude Code) and from $0.44 to
-  $0.22 (Codex).
+  wall time. Pass rates rose from 19/26 to 26/27 (Claude Code) and from 13/15 to 14/15 (Codex).
+- **Cheaper per correct answer.** Cost per passing answer fell from $0.50 to $0.24 (Claude Code) and from $0.44 to
+  $0.24 (Codex).
 - **No overhead when it isn't needed.** On control questions that don't need the atlas, the pointer changed token
   use by 0.96× and 1.00×.
 - **Loading the whole knowledge base is the expensive option.** Telling the agent to read every knowledge file
@@ -65,7 +65,7 @@ Runs were identical except for the standing instructions the agent saw:
 | Model | Claude Opus 5.5 (1M context), effort high | gpt-6.1-sol, effort high |
 | Subagents allowed | Claude Haiku 5.5 (none were spawned) | gpt-6-luna (none were spawned) |
 | Repetitions | 3 for `none` and `atlas`, 2 for `dump` and `hint` | 1 complete, plus 23 runs of a second |
-| Scored runs | 106 | 65 |
+| Scored runs | 105 | 65 |
 
 Each run was fresh, non-interactive and not persisted (so it could never become atlas evidence), started in the
 research repo, with a 20-minute timeout. No run timed out. Unequal repetitions are fine because each question's
@@ -106,6 +106,9 @@ More detail: [transcript-formats.md](transcript-formats.md#agent-isolation-for-b
   location). **Pass** means a score of at least 0.8. One LLM grader per question saw all answers to that question,
   anonymized and shuffled, and was told to ignore which sources an answer cited. The T1 and T2 answers were also
   checked mechanically against the ground truth, and low scores and the critical error were reviewed by hand.
+- **Corrections after the run:** A3's database-status item was re-keyed to the database state on the run date,
+  checked afterwards from file install times, and that item was regraded. One Claude Code `none` run of A6 is
+  excluded: it found an old test plan that contained the expected answer.
 - **Analysis:** for each question, the geometric mean over repetitions of arm ÷ `none`; then the geometric mean over
   questions, with a bootstrap 95% confidence interval that resamples questions, the independent unit.
 
@@ -115,25 +118,25 @@ More detail: [transcript-formats.md](transcript-formats.md#agent-isolation-for-b
 
 | Agent | Arm | Runs | Pass | Mean score | Median tokens | Mean cost per run | Cost per pass | Median wall time |
 |---|---|---|---|---|---|---|---|---|
-| Claude Code | `none` | 27 | 20/27 | 0.86 | 367k | $0.36 | $0.49 | 102 s |
-| Claude Code | **`atlas`** | 27 | **26/27** | **0.98** | **196k** | **$0.23** | **$0.24** | **45 s** |
-| Claude Code | `dump` | 18 | 17/18 | 0.99 | 593k | $0.90 | $0.95 | 56 s |
+| Claude Code | `none` | 26 | 19/26 | 0.86 | 369k | $0.36 | $0.50 | 102 s |
+| Claude Code | **`atlas`** | 27 | **26/27** | **0.96** | **196k** | **$0.23** | **$0.24** | **45 s** |
+| Claude Code | `dump` | 18 | 17/18 | 0.96 | 593k | $0.90 | $0.95 | 56 s |
 | Claude Code | `hint` | 18 | 13/18 | 0.88 | 337k | $0.42 | $0.58 | 83 s |
-| Codex | `none` | 15 | 13/15 | 0.93 | 239k | $0.38 | $0.44 | 90 s |
-| Codex | **`atlas`** | 15 | **15/15** | **0.99** | **128k** | **$0.22** | **$0.22** | **54 s** |
-| Codex | `dump` | 13 | 12/13 | 0.95 | 1,620k | $0.90 | $0.97 | 196 s |
+| Codex | `none` | 15 | 13/15 | 0.92 | 239k | $0.38 | $0.44 | 90 s |
+| Codex | **`atlas`** | 15 | **14/15** | **0.97** | **128k** | **$0.22** | **$0.24** | **54 s** |
+| Codex | `dump` | 13 | 11/13 | 0.94 | 1,620k | $0.90 | $1.06 | 196 s |
 | Codex | `hint` | 15 | 10/15 | 0.85 | 280k | $0.35 | $0.53 | 99 s |
 
 Ratios to `none`, with 95% confidence intervals:
 
 | Agent | Arm | Tokens | Cost | Wall time | Score difference |
 |---|---|---|---|---|---|
-| Claude Code | **`atlas`** | **0.49** (0.41–0.58) | **0.65** (0.55–0.75) | **0.42** (0.31–0.56) | +0.12 (+0.00 to +0.26) |
-| Claude Code | `dump` | 1.57 (1.27–1.97) | 2.62 (2.20–3.14) | 0.47 (0.34–0.67) | +0.13 (−0.00 to +0.28) |
-| Claude Code | `hint` | 1.05 (0.75–1.46) | 1.06 (0.84–1.35) | 0.74 (0.49–1.12) | +0.02 (−0.08 to +0.12) |
-| Codex | **`atlas`** | **0.42** (0.34–0.53) | **0.59** (0.50–0.68) | **0.43** (0.36–0.52) | +0.03 (+0.00 to +0.10) |
+| Claude Code | **`atlas`** | **0.49** (0.41–0.58) | **0.65** (0.56–0.75) | **0.41** (0.31–0.55) | +0.10 (−0.00 to +0.21) |
+| Claude Code | `dump` | 1.57 (1.27–1.97) | 2.62 (2.21–3.15) | 0.47 (0.34–0.66) | +0.10 (−0.01 to +0.23) |
+| Claude Code | `hint` | 1.05 (0.75–1.46) | 1.07 (0.84–1.35) | 0.73 (0.47–1.11) | +0.02 (−0.08 to +0.12) |
+| Codex | **`atlas`** | **0.42** (0.34–0.53) | **0.59** (0.50–0.68) | **0.43** (0.36–0.52) | +0.02 (+0.00 to +0.07) |
 | Codex | `dump` | 3.74 (1.96–6.73) | 2.35 (1.61–3.36) | 1.87 (1.11–2.71) | +0.02 (+0.00 to +0.07) |
-| Codex | `hint` | 0.92 (0.73–1.22) | 0.98 (0.84–1.17) | 0.99 (0.81–1.16) | −0.09 (−0.17 to −0.02) |
+| Codex | `hint` | 0.92 (0.73–1.22) | 0.98 (0.84–1.17) | 0.99 (0.81–1.16) | −0.08 (−0.17 to +0.00) |
 
 Cost falls less than tokens because the atlas saves disproportionately on cached input, the cheapest kind: cached
 input was 90% of Claude Code's `none` tokens but 84% of its `atlas` tokens (Codex: 85% and 76%). The median peak
@@ -147,17 +150,17 @@ Median tokens (thousands) / mean score:
 |---|---|---|---|---|---|---|---|---|
 | A1 retrieval | 557 / 0.61 | 194 / 0.89 | 594 / 1.00 | 914 / 0.75 | 581 / 1.00 | 186 / 1.00 | 1620 / 1.00 | 394 / 0.83 |
 | A2 retrieval | 615 / 1.00 | 187 / 1.00 | 512 / 1.00 | 1063 / 1.00 | 891 / 1.00 | 211 / 1.00 | 1621 / 1.00 | 723 / 0.86 |
-| A3 retrieval | 365 / 0.47 | 205 / 1.00 | 1027 / 1.00 | 708 / 0.40 | 159 / 0.50 | 81 / 0.80 | 866 / 0.70 | 200 / 0.50 |
+| A3 retrieval | 365 / 0.47 | 205 / 0.80 | 1027 / 0.80 | 708 / 0.40 | 159 / 0.40 | 81 / 0.60 | 866 / 0.60 | 200 / 0.50 |
 | A4 retrieval | 667 / 0.67 | 198 / 1.00 | 934 / 1.00 | 807 / 1.00 | 266 / 1.00 | 90 / 1.00 | 1725 / 1.00 | 321 / 0.88 |
 | A5a retrieval | 367 / 1.00 | 216 / 1.00 | 533 / 1.00 | 208 / 0.75 | 381 / 1.00 | 189 / 1.00 | 786 / 1.00 | 278 / 1.00 |
 | A5b retrieval | 362 / 1.00 | 222 / 0.92 | 607 / 0.88 | 320 / 1.00 | 166 / 1.00 | 110 / 1.00 | 2177 / 1.00 | 377 / 0.62 |
-| A6 negative | 330 / 1.00 | 119 / 1.00 | 787 / 1.00 | 191 / 1.00 | 479 / 1.00 | 149 / 1.00 | 268 / 1.00 | 292 / 1.00 |
+| A6 negative | 329 / 1.00 | 119 / 1.00 | 787 / 1.00 | 191 / 1.00 | 479 / 1.00 | 149 / 1.00 | 268 / 1.00 | 292 / 1.00 |
 | T1 task | 388 / 1.00 | 253 / 1.00 | 586 / 1.00 | 231 / 1.00 | 184 / 1.00 | 127 / 1.00 | 2054 / 1.00 | 118 / 1.00 |
 | T2 task | 244 / 1.00 | 185 / 1.00 | 434 / 1.00 | 333 / 1.00 | 140 / 1.00 | 80 / 1.00 | 1185 / 1.00 | 129 / 1.00 |
 
 The atlas used fewer tokens than `none` on every question, for both agents. The quality gains are in questions that
 need research history rather than a file search: A1 (which datasets and references exist), A3 (which recordings
-exist and their database status) and A4, where one Claude Code `none` run presented the non-existent mount path as
+exist) and A4, where one Claude Code `none` run presented the non-existent mount path as
 real.
 
 ### Control questions (C1, C2)
@@ -189,11 +192,9 @@ rerun with two such models to see whether the atlas still helps when the agent i
 - Same questions, sandbox, metrics and grading protocol, with a fresh set of blind graders. No run timed out,
   spawned a subagent or made a critical error.
 - The knowledge base had grown to 332 KB through regular refreshes (256 KB on 2026-11-02).
-- A3 was re-keyed. The month's recordings were imported into the database between the two runs, so its status item
-  now asks for the rows that exist. See [the note on A3](#note-on-a3) for what this means for the first run.
-- Two more paths were hidden in every arm. Claude Code's paste cache (`~/.claude/paste-cache/`) held an old
-  acceptance-test plan that included A6's expected answer, and a new notes folder quoted the atlas. Three Claude
-  Code `none` runs of A6 found the plan before it was hidden; they were discarded and rerun.
+- A3's database-status item is keyed to the database as of 2026-11-06, after a labeled import on 2026-11-05.
+- Claude Code's paste cache (`~/.claude/paste-cache/`) and a new notes folder that quotes the atlas were also
+  hidden in every arm.
 
 ### Results
 
@@ -244,23 +245,16 @@ Pass rate and cost per pass on the research questions:
 
 | Agent | Model | `none` | `atlas` |
 |---|---|---|---|
-| Claude Code | Claude Opus 5.5 | 20/27, $0.49 | 26/27, $0.24 |
+| Claude Code | Claude Opus 5.5 | 19/26, $0.50 | 26/27, $0.24 |
 | Claude Code | Claude Haiku 5.5 | 17/27, $0.13 | 26/27, $0.05 |
-| Codex | gpt-6.1-sol | 13/15, $0.44 | 15/15, $0.22 |
+| Codex | gpt-6.1-sol | 13/15, $0.44 | 14/15, $0.24 |
 | Codex | gpt-6-luna | 17/27, $0.07 | 26/27, $0.02 |
 
 With the atlas, the smaller models passed about as often as the frontier models did with it, at a fifth (Claude
-Code) and a tenth (Codex) of the cost per pass, and more often than the frontier models without it. Read this
-comparison loosely: the runs are four days apart, the knowledge base had grown, A3 was re-keyed, the Codex CLI was
+Code) and a twelfth (Codex) of the cost per pass, and more often than the frontier models without it. Read this
+comparison loosely: the runs are four days apart, the knowledge base had grown, A3's database state had changed, the Codex CLI was
 newer and the graders were different.
 
-### Note on A3
-
-The re-check for the follow-up showed that the first run's A3 key may have been partly wrong. It expected "not yet in
-the database", but some of the month's rows came from an earlier, partial import whose date can't be established,
-so they may already have existed on 2026-11-02. No A3 answer in the first run made a critical error. If the status
-item is dropped from the first run, Codex `atlas` passes 14/15 instead of 15/15 and Codex `dump` 11/13 instead of
-12/13; mean scores change by at most 0.02 and no other pass count changes.
 
 ## Spend
 
@@ -280,7 +274,7 @@ estimates scaled by 2.36. Ratios don't depend on this if prices scale uniformly.
 component, the Codex `atlas` cost ratio would be 0.49×, 0.64× or 0.53×, and `dump` 3.19×, 2.21× or 1.85×; the
 conclusions hold in every case. Lesson: cap budgets on billed spend, not on list-price estimates.
 
-The smaller-model follow-up (2026-11-06), including the three discarded runs:
+The smaller-model follow-up (2026-11-06), including three repeated runs:
 
 | Model | Runs | Billed |
 |---|---|---|
@@ -298,9 +292,11 @@ isn't included in either total.
 
 - **One project, 9 questions.** Confidence intervals resample questions and are wide. In the first run the token
   result holds on every question for both agents; the quality result doesn't.
-- **Possible rubric bias.** Rubric items were written from verified facts, but some phrasings (such as "not yet in
-  the database") match how the atlas words them. This may favour `atlas` and `dump` on quality; it doesn't affect
-  tokens. That item was also possibly wrong ([note on A3](#note-on-a3)).
+- **Possible rubric bias.** Rubric items were written from verified facts, but some phrasings match how the atlas
+  words them. This may favour `atlas` and `dump` on quality; it doesn't affect tokens.
+- **The atlas can be stale.** In the first run, the atlas still said the October nights weren't in the database;
+  another pipeline had added rows three days earlier. Answers that relied on it repeated the claim, and no arm found
+  the rows.
 - **Imperfect blinding.** Answers that cite the atlas reveal their arm. Graders were told to ignore sources.
 - **Ceiling effect.** In the first run, Codex without the atlas already passed 13/15, which leaves little room to
   show a quality gain. The smaller models had more room.
@@ -308,9 +304,6 @@ isn't included in either total.
   reported in the first run and recomputed from tokens in the follow-up.
 - **Tool calls aren't comparable across agents.** Codex batches several commands into one call.
 - **One contaminated run.** One Codex `none` run listed the hidden, empty atlas folder; nothing could leak from it.
-- **A gap in the first run's isolation.** One Claude Code `none` run of A6 found the old acceptance-test plan in
-  Claude Code's paste cache, which included A6's expected answer. A6 scored 1.00 in every arm of both runs, so no
-  result changes; the cache was hidden for the follow-up.
 - **Scoring takes the final message only.** One Claude Haiku `none` run gave its answer in an earlier message and
   ended with a short note, so it scored 0. The first run used the same rule.
 - **Not reproducible as published.** The harness and questions refer to private research data, so they are not

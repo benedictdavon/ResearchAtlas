@@ -177,13 +177,13 @@ Ratios are relative to `none`: the geometric mean over questions, with bootstrap
 
 | agent | arm | tokens × none | cost × none | wall time × none | pass rate | cost per pass |
 |---|---|---|---|---|---|---|
-| Claude Code | none | – | – | – | 20/27 | $0.49 |
-| Claude Code | **atlas** | **0.49** (0.41–0.58) | **0.65** (0.55–0.75) | 0.42 | **26/27** | **$0.24** |
+| Claude Code | none | – | – | – | 19/26 | $0.50 |
+| Claude Code | **atlas** | **0.49** (0.41–0.58) | **0.65** (0.56–0.75) | 0.41 | **26/27** | **$0.24** |
 | Claude Code | dump | 1.57 | 2.62 | 0.47 | 17/18 | $0.95 |
-| Claude Code | hint | 1.05 | 1.06 | 0.74 | 13/18 | $0.58 |
+| Claude Code | hint | 1.05 | 1.07 | 0.73 | 13/18 | $0.58 |
 | Codex | none | – | – | – | 13/15 | $0.44 |
-| Codex | **atlas** | **0.42** (0.34–0.53) | **0.59** (0.50–0.68) | 0.43 | **15/15** | **$0.22** |
-| Codex | dump | 3.74 | 2.35 | 1.87 | 12/13 | $0.97 |
+| Codex | **atlas** | **0.42** (0.34–0.53) | **0.59** (0.50–0.68) | 0.43 | **14/15** | **$0.24** |
+| Codex | dump | 3.74 | 2.35 | 1.87 | 11/13 | $1.06 |
 | Codex | hint | 0.92 | 0.98 | 0.99 | 10/15 | $0.53 |
 
 - The atlas pointer roughly **halved token use** and **cut wall time by more than half**, with the same or better
