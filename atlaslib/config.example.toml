@@ -25,13 +25,13 @@ workspace_cwd = {}
 name = "demo_project"
 work_dir = "work/demo_project"                      # relative to the atlas home; generated
 knowledge_dir = "projects/demo_project/knowledge"   # relative to the atlas home; the curated knowledge base
-# A session is selected if its cwd is under one of these roots ...
+# A session is selected if its cwd is under one of these roots, or if its text mentions one of them ...
 roots = [
   "~/research/demo_project",
 ]
-# ... or if its cwd is under one of these and its text mentions a root ...
+# ... or if its cwd is under one of these (selection by cwd only) ...
 cwd_also = ["~/research"]
-# ... or if its non-injected text mentions a root. Sessions under these cwds are never selected (D16).
+# ... or if it is a subagent or fork of a selected session. Sessions under these cwds are never selected (D16).
 exclude_cwd = ["~/.researchatlas"]
 # Session ids or id prefixes to skip (e.g. sessions that only tested the atlas); their subagents/forks too (D20).
 exclude_ids = []

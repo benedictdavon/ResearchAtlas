@@ -34,7 +34,7 @@ def discover_candidates(cfg, codex_paths=None, skipped=None):
 def select_candidates(cands, cfg):
     """Selection by cwd, then by parent, per docs/architecture.md §1. Returns key -> selected_by (mention is pass C)."""
     proj, excl = cfg["project"], cfg["project"]["exclude_cwd"]
-    wifi = proj["roots"] + proj["cwd_also"]
+    cwd_roots = proj["roots"] + proj["cwd_also"]
     ex_ids = tuple(proj.get("exclude_ids", []))
     for c in cands:
         c["excluded"] = under(c["cwd"], excl) or bool(ex_ids and c["id"].startswith(ex_ids))
@@ -48,7 +48,7 @@ def select_candidates(cands, cfg):
                 c["excluded"] = changed = True
     sel = {}
     for c in cands:
-        if not c["excluded"] and under(c["cwd"], wifi):
+        if not c["excluded"] and under(c["cwd"], cwd_roots):
             sel[c["key"]] = "cwd"
     changed = True
     while changed:
