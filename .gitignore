@@ -1,0 +1,12 @@
+# Local configuration (real paths)
+/config.toml
+
+# Generated intermediates (re-creatable via atlas.py)
+/work/
+
+# Your knowledge bases: private research content, keep out of this repo
+/projects/
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

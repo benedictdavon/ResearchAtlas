@@ -1,0 +1,58 @@
+# ResearchAtlas configuration. Copy to config.toml (gitignored) and edit. Read by atlas.py (stdlib tomllib).
+# All paths are absolute unless noted. Every [sources] key is optional: a missing key disables that source.
+
+[sources]
+codex_sessions = "/home/user/.codex/sessions"
+codex_session_index = "/home/user/.codex/session_index.jsonl"
+claude_projects = "/home/user/.claude/projects"
+
+# GitHub Copilot (D22). chat_storage: per-workspace mirror written by `atlas.py import-copilot` (D24).
+# chat_dirs: manually exported VS Code Chat panel logs, with the workspace folder they came from.
+# agent_state: Copilot agent sessions. vscode_storage: server-side Chat transcripts (ephemeral).
+# workspace_cwd: folder for a workspace hash that has no workspace.json.
+[sources.copilot]
+chat_storage = "/home/user/ResearchAtlas/work/copilot_import/workspaceStorage"
+chat_dirs = [
+  # { path = "/home/user/copilot_export/chatSessions", cwd = "/home/user/research/demo_project" },
+]
+agent_state = "/home/user/.copilot/session-state"
+vscode_storage = "/home/user/.vscode-server/data/User/workspaceStorage"
+workspace_cwd = {}
+
+[project]
+name = "demo_project"
+work_dir = "work/demo_project"                      # relative to this repo; generated, gitignored
+knowledge_dir = "projects/demo_project/knowledge"   # relative to this repo; the curated knowledge base
+# A session is selected if its cwd is under one of these roots ...
+roots = [
+  "/home/user/research/demo_project",
+]
+# ... or if its cwd is under one of these and its text mentions a root ...
+cwd_also = ["/home/user/research"]
+# ... or if its non-injected text mentions a root. Sessions under these cwds are never selected (D16).
+exclude_cwd = ["/home/user/ResearchAtlas"]
+# Session ids or id prefixes to skip (e.g. sessions that only tested the atlas); their subagents/forks too (D20).
+exclude_ids = []
+
+[paths]
+# Absolute paths under these prefixes are harvested from transcripts and verified against disk.
+roots = [
+  "/mnt/data",
+  "/home/user/research",
+]
+verify_timeout_s = 5      # per-path stat timeout; network mounts can hang
+max_session_ids = 20
+
+[limits]
+# Truncation (chars) for the condensed transcripts.
+user_text = 8000
+agent_final = 40000
+agent_commentary = 2000
+tool_input = 400
+subagent_result = 3000
+
+[knowledge]
+# Path abbreviations used inside knowledge/*.md (expanded when refresh re-verifies cited paths).
+abbreviations = { DP = "/home/user/research/demo_project" }
+# refresh reports new paths not cited in knowledge/ that were used in at least this many sessions.
+new_path_min_sessions = 1
