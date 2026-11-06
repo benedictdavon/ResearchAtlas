@@ -1,6 +1,6 @@
 """ResearchAtlas CLI: mine agent transcripts into a verified research knowledge base.
 
-Subcommands (see docs/architecture.md):
+Subcommands (see docs/cli.md):
   init      create a config.toml in the atlas home from the bundled template
   extract   condensed per-session markdown + sessions.jsonl + per-session path hits
   import-copilot  receive a selective PC chat archive; optionally run extract
@@ -69,7 +69,7 @@ def main(argv=None):
     p = sub.add_parser(
         "refresh",
         help="run extract + paths, then report sessions to review, broken cited paths, "
-        "and new uncited paths (docs/architecture.md §4); writes no review state",
+        "and new uncited paths (docs/cli.md, refresh); writes no review state",
     )
     p.add_argument("--no-verify-cited", action="store_true", help="skip re-verifying paths cited in knowledge/*.md")
     p.add_argument(
@@ -89,7 +89,7 @@ def main(argv=None):
     p.add_argument("--note", default="", help="short note stored with each row (e.g. the update it went into)")
     p.set_defaults(func=cmd_mark_reviewed)
 
-    p = sub.add_parser("find", help="search knowledge/, paths.jsonl and condensed sessions (docs/architecture.md §5)")
+    p = sub.add_parser("find", help="search knowledge/, paths.jsonl and condensed sessions (docs/cli.md, find)")
     p.add_argument(
         "term",
         nargs="+",

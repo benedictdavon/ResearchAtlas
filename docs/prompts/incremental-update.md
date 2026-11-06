@@ -1,21 +1,17 @@
 # Incremental update prompt (after `researchatlas refresh`)
 
-Used for step 3 of `docs/refresh-guide.md`. The user starts an agent in the atlas home and says:
-"Follow `docs/prompts/incremental-update.md` with the report `work/<project>/refresh_<YYYYMMDD>.txt`."
+Used for step 3 of [refresh-guide.md](../refresh-guide.md). The user starts an agent in the atlas home and says:
+"Follow `incremental-update.md` with the report `work/<project>/refresh_<YYYYMMDD>.txt`."
 
-Below, `<project>` is `[project].name` from `config.toml`, the knowledge folder is `projects/<project>/knowledge/`
-and the condensed transcripts are in `work/<project>/sessions/`.
+Below, `<project>` is `[project].name` from `config.toml`, the knowledge folder is `projects/<project>/knowledge/`,
+the condensed transcripts are in `work/<project>/sessions/`, and `<prompts>` is the folder holding this file.
 
 ---
 
 You are updating the ResearchAtlas knowledge files from a refresh report.
 
-**Read first.** `AGENTS.md` (if present), then:
-- `docs/design-decisions.md` D13 (trust order), D15/D22 (citation ids), D16/D20 (excluded sessions), D25 (review ledger);
-- `projects/<project>/knowledge/INDEX.md`;
-- the refresh report named by the user.
-
-Open the other knowledge files when you need them. Don't read the whole docs set.
+**Read first:** `projects/<project>/knowledge/INDEX.md` and the refresh report named by the user. Open the other
+knowledge files when you need them.
 
 **Rules**
 - Read-only outside the atlas home. Never modify the research repo, data mounts, related repos or databases, even to
@@ -27,6 +23,9 @@ Open the other knowledge files when you need them. Don't read the whole docs set
   couldn't verify as a path.
 - Cite every claim: `[codex:<id13> <date>]`, `[claude:<id8> <date>]`, `[copilot:<id8> <date>]`, or `[file:<path>]`.
   The condensed transcript for a citation is `work/<project>/sessions/<source>_<id>.md`.
+- When sources conflict, higher rank wins, and within a rank the newer one: (1) the filesystem or project
+  database, (2) recent sessions and the experiment folders' own files, (3) handoff or summary documents in the
+  research repo, (4) older sessions, (5) documents known to be outdated.
 - Never invent paths, numbers or conclusions. If something is unclear or two sources conflict, add it to
   `open_questions.md` (§1 for questions to the user, §3 for result conflicts) instead of guessing.
 - Keep the existing style of each file: path abbreviations from `[knowledge].abbreviations` (e.g. `DP/`), section
@@ -38,10 +37,9 @@ Open the other knowledge files when you need them. Don't read the whole docs set
 1. **List the work.** From the report, take the new and changed sessions. Group them by experiment folder (the `cwd`
    in each condensed file's header). Keep a parent and its subagents/forks together.
    - **Small** (≤ ~10 sessions and ≤ ~400 KB condensed in total, `wc -c`): read them yourself, completely.
-   - **Large:** give one subagent per group of ≤ ~400 KB. Name the condensed files in its task and ask for a list of
-     claims (datasets, paths, experiment purpose/method/result/status, decisions), each with its citation and
-     without interpretation. Have it write the claims to `work/<project>/claims/<YYYYMMDD>_<group>.md`. Then merge
-     the claims yourself.
+   - **Large:** pack the groups into batches of ≤ ~400 KB and give each batch to a subagent with
+     `<prompts>/claim-extraction.md`, naming the batch `<YYYYMMDD>_<group>` and its condensed files in the task. It
+     writes cited claims to `work/<project>/claims/<batch>.md`. Then merge the claims yourself.
 2. **Check against the files.** For each experiment touched, open its folder and its results files. Note the status
    (complete / in progress / abandoned), the conclusion, and the key numbers with their source file.
 3. **Update the knowledge files.**
@@ -71,4 +69,4 @@ Open the other knowledge files when you need them. Don't read the whole docs set
 8. **Mark reviewed.** `researchatlas mark-reviewed --report <the report>`. Sessions you skipped on purpose are
    marked too; say so in your report. If you could not finish some, mark only the finished ones by id
    (`mark-reviewed --report <report> <id> … --note "…"`). Always mark against the supplied report, even if sessions
-   grew during your work: their newer content then stays pending for the next refresh (D25).
+   grew during your work: their newer content then stays pending for the next refresh.

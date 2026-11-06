@@ -47,7 +47,7 @@ CITE_PATH_END_RE = re.compile(r"(?:[^ ]|(?<=\d-\d\d) \d\d[:_]\d\d[:_]\d\d)+")
 
 
 def expand_cited(span, abbrev):
-    """Absolute path for one backtick span from knowledge/*.md, or None (docs/architecture.md §4 step 3b)."""
+    """Absolute path for one backtick span from knowledge/*.md, or None (docs/cli.md, refresh part 2)."""
     s = span.split(" (", 1)[0].strip()
     if not s or any(c in s for c in CITE_TEMPLATE_CHARS) or any(t in s for t in CITE_TEMPLATE_TOKENS):
         return None
@@ -161,7 +161,7 @@ def atlas_feedback(path):
 
 
 def cmd_refresh(cfg, args):
-    """Run extract + paths, then report what needs review (docs/architecture.md §4). Exit 0 unless an internal error."""
+    """Run extract + paths, then report what needs review (docs/cli.md, refresh). Exit 0 unless an internal error."""
     wp = work_paths(cfg)
     rc, out = run_quiet(cmd_extract, cfg, argparse.Namespace(force=False))
     if rc:

@@ -89,7 +89,7 @@ flowchart LR
 2. **`paths`** aggregates those paths and checks each one on disk, with per-path timeouts so a hung network mount
    can't stall the run.
 3. **Synthesis.** A coding agent writes `knowledge/` (datasets, experiments, decisions) from the condensed sessions
-   and verified paths, following the rules in [docs/architecture.md](docs/architecture.md) §3. Every claim must
+   and verified paths, following the rules in [docs/knowledge-format.md](docs/knowledge-format.md). Every claim must
    cite its source.
 4. **`refresh`** reports what changed since the last review: new or changed sessions, cited paths that broke, and
    frequently used new paths. An agent applies the report, then **`mark-reviewed`** records the covered sessions in
@@ -129,8 +129,9 @@ Working from a clone instead? `python atlas.py <command>` runs the same CLI, and
 home, so `config.toml`, `work/` and `projects/` sit next to the code (all gitignored).
 
 Then have an agent write `projects/<project>/knowledge/` in the atlas home from the condensed sessions and verified
-paths. The format and rules are in [docs/architecture.md](docs/architecture.md) §3. Once the knowledge exists, keep
-it current:
+paths, using the [initial-build prompt](docs/prompts/initial-build.md); the format is in
+[docs/knowledge-format.md](docs/knowledge-format.md). [Getting started](docs/getting-started.md) walks through the
+whole setup. Once the knowledge exists, keep it current:
 
 ```bash
 researchatlas refresh | tee work/<project>/refresh_$(date +%Y%m%d).txt   # sessions to review, broken cited paths, new paths
@@ -207,12 +208,14 @@ project shapes. [Background and scope](docs/background.md) says what it assumes 
 
 | Document | What it covers |
 |---|---|
-| [Architecture](docs/architecture.md) | Layout, configuration, each command, the knowledge format |
-| [Design decisions](docs/design-decisions.md) | D1–D29: what was chosen, the alternatives and why |
-| [Transcript formats](docs/transcript-formats.md) | How Codex, Claude Code and Copilot store sessions, and how each is parsed |
+| [Getting started](docs/getting-started.md) | Install, configure, build the first knowledge base, connect your agents |
 | [Refresh guide](docs/refresh-guide.md) | Keeping a knowledge base current as new sessions arrive |
-| [Update prompt](docs/prompts/incremental-update.md) | Instructions for the agent that applies a refresh report to `knowledge/` |
-| [Roadmap](docs/roadmap.md) | Deferred features and what would justify them |
+| [CLI](docs/cli.md) · [Configuration](docs/configuration.md) · [Knowledge format](docs/knowledge-format.md) | Reference for commands, `config.toml` and the knowledge files |
+| [Transcript formats](docs/transcript-formats.md) | How Codex, Claude Code and Copilot store sessions, and how each is parsed |
+| [Background and scope](docs/background.md) | Why it exists, what it assumes, what hasn't been tested |
+| [Architecture](docs/architecture.md) · [Design decisions](docs/design-decisions.md) · [Roadmap](docs/roadmap.md) | Internals, D1–D29 with alternatives and reasons, deferred features |
+| [Benchmark](docs/benchmark.md) | The full evaluation: setup, results, cost, limitations |
+| [Agent prompts](docs/prompts/) | Building the first knowledge base and applying refresh reports |
 
 ## Development
 
@@ -231,7 +234,7 @@ guidelines and [CHANGELOG.md](CHANGELOG.md) for release notes.
 | `tools/copilot_sync.py` | Client-side Copilot chat uploader |
 | `examples/demo/` | End-to-end demo on a fictional project |
 | `tests/` | Unit tests and a demo smoke test, synthetic data only |
-| `docs/` | Architecture, design decisions, transcript formats, guides ([index](docs/README.md)) |
+| `docs/` | Guides, references, design, benchmark and agent prompts ([index](docs/README.md)) |
 
 ## License
 

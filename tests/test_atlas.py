@@ -1,7 +1,7 @@
 """Regression tests for ResearchAtlas: the documented parsing, selection, path and citation rules.
 
 The spec is docs/transcript-formats.md ("Transcript parsing rules", "Extraction and path facts"),
-docs/design-decisions.md (D15-D20) and docs/architecture.md (sections 1-5). Tests describe those rules.
+docs/design-decisions.md (D15-D20) and docs/cli.md. Tests describe those rules.
 They don't snapshot what the code happens to do.
 
 Only synthetic transcripts in temporary directories are used. Nothing under ~/.codex, ~/.claude,
@@ -1056,7 +1056,7 @@ class CitedPathsTests(TempAtlasCase):
         )
 
     def test_spans_followed_by_cross_mark_are_skipped(self):
-        # docs/architecture.md §4: ✗-marked citations are known-missing and are not re-reported.
+        # docs/cli.md, refresh: ✗-marked citations are known-missing and are not re-reported.
         self.write_knowledge(
             "datasets.md",
             "- gone: `EXP/rec_export_29990101_000000` ✗ 2026-10-22\n"

@@ -23,8 +23,9 @@ First public release.
 - `find`: search the knowledge base by section, then verified paths, then condensed sessions.
 - `import-copilot` and `tools/copilot_sync.py`: preview and upload selected VS Code Chat logs from a client PC
   over SSH.
-- Agent prompt for applying a refresh report to the knowledge files, and documentation of the transcript formats,
-  architecture and design decisions.
+- Agent prompts for building the first knowledge base and for applying a refresh report.
+- Documentation by reader: getting started, refresh guide, CLI, configuration and knowledge-format references,
+  transcript formats, architecture, design decisions, background and scope, and a benchmark report.
 - End-to-end demo on a fictional project (`examples/demo`).
 - CI on Ubuntu and macOS with Python 3.11 to 3.13.
 

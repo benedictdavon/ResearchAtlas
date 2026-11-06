@@ -1,6 +1,6 @@
 """extract: condense Codex/Claude/Copilot transcripts into work/<project>/sessions and index them.
 
-See docs/architecture.md §1.
+See docs/cli.md, extract.
 """
 
 import json
@@ -32,7 +32,7 @@ def discover_candidates(cfg, codex_paths=None, skipped=None):
 
 
 def select_candidates(cands, cfg):
-    """Selection by cwd, then by parent, per docs/architecture.md §1. Returns key -> selected_by (mention is pass C)."""
+    """Selection by cwd, then by parent, per docs/cli.md, extract. Returns key -> selected_by (mention is pass C)."""
     proj, excl = cfg["project"], cfg["project"]["exclude_cwd"]
     cwd_roots = proj["roots"] + proj["cwd_also"]
     ex_ids = tuple(proj.get("exclude_ids", []))
@@ -122,7 +122,7 @@ def write_condensed(c, st, title, out_path, cwd, cli):
 
 
 def write_pathhits(c, st, pathhits_dir):
-    """Per-session path hits for the paths worker (docs/architecture.md §2, D17)."""
+    """Per-session path hits for the paths worker (docs/cli.md, extract and paths; D17)."""
     out = pathhits_dir / f"{c['source']}_{c['short']}.json"
     obj = {
         "source": c["source"],
@@ -181,7 +181,7 @@ def remove_stale(folder, keep, pattern):
 
 
 def cmd_extract(cfg, args):
-    """Condense transcripts into work/<project>/sessions and index them (docs/architecture.md §1)."""
+    """Condense transcripts into work/<project>/sessions and index them (docs/cli.md, extract)."""
     t0 = time.time()
     wp = work_paths(cfg)
     ctx = {

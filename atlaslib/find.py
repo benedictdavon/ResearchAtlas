@@ -1,4 +1,4 @@
-"""find: case-insensitive search over knowledge/, paths.jsonl and condensed sessions (docs/architecture.md §5, D26).
+"""find: case-insensitive search over knowledge/, paths.jsonl and condensed sessions (docs/cli.md, find; D26).
 
 Knowledge files are matched per section (a heading through the next heading), so the words may sit on
 different lines of one entry; the heading path counts as part of the section. Sessions are matched per
@@ -135,7 +135,7 @@ def more(n, limit):
 
 
 def cmd_find(cfg, args):
-    """Case-insensitive search: all words must occur in one section, path or message (docs/architecture.md §5)."""
+    """Case-insensitive search: all words must occur in one section, path or message (docs/cli.md, find)."""
     words = [w.lower() for t in args.term for w in t.split()]
     if not words:
         print("error: empty search term", file=sys.stderr)

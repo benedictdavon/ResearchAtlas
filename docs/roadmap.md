@@ -11,7 +11,7 @@ trigger actually happens, and the decision is recorded in [design-decisions.md](
 | **Scheduled / automatic refresh** | Fresh knowledge without anyone running a command | Reliable scheduling exists (e.g. a persistent service outside an ephemeral container), and on-command refresh is often forgotten |
 | **Data-mount inventory scanner** | Discover data that no session ever mentioned | Important datasets turn out to be missing from the atlas because no agent ever touched them |
 | **Project-database extractor** | Pull dataset/recording metadata straight from the project's database | The database holds many datasets that transcripts don't cover |
-| **Experiment-folder miner** | Systematically summarise every experiment folder (README, notebook header cells) | Acceptance tests fail on experiments that had no agent sessions |
+| **Experiment-folder miner** | Systematically summarise every experiment folder (README, notebook header cells) | The acceptance questions (getting-started.md, step 6) fail on experiments that had no agent sessions |
 | **Code/document graph** | Relationship graph (scripts ↔ loaders ↔ reports) | Recurring questions about *code* relationships that grep and agents answer poorly. Evaluate against the working atlas first |
 | **Multi-project support** | More `projects/<name>/` entries | A second repo needs coverage. The layout already allows it; config currently describes one project |
 | **Codex native memories** | Use Codex's own `memories/` feature as a cache | It proves useful alongside the atlas |

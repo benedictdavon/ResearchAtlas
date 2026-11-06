@@ -81,7 +81,7 @@ def load_config(path=None):
 
 
 def work_paths(cfg):
-    """Locations of the generated intermediates (docs/architecture.md, Layout)."""
+    """Locations of the generated intermediates (docs/architecture.md, Data files)."""
     w = cfg["project"]["work_dir"]
     return {
         "work": w,
@@ -166,7 +166,7 @@ def tidy_body(text):
 
 
 def truncate(text, limit):
-    """Cut text to limit chars and mark the cut (docs/architecture.md §1, limits in config.toml)."""
+    """Cut text to limit chars and mark the cut (docs/configuration.md, [limits])."""
     if limit is None or len(text) <= limit:
         return text
     return text[:limit] + f" …[truncated {len(text) - limit} chars]"
@@ -186,7 +186,7 @@ PATH_RE_TMPL = (
     r"(?:(?<=file://)|(?<![\w./-])|(?<=\\[ntr]))(?:{root})(?=/|[^\w.\-]|$)"
     r"(?:[^" + PATH_STOP + r"()]|" + PATH_GROUP + r"|(?<=\d-\d\d) \d\d[:_]\d\d[:_]\d\d)*"
 )
-# Kind guess by extension (docs/architecture.md §2). Anything else: "dir" if verified as a
+# Kind guess by extension (docs/cli.md, paths). Anything else: "dir" if verified as a
 # directory, else "other".
 PATH_KINDS = [
     ("data", ".npy .npz .h5 .hdf5 .mat .csv .dat .pkl .pickle .parquet .feather .bin .json .txt .wav"),

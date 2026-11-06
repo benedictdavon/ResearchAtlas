@@ -41,7 +41,7 @@ reduced to a one-line summary so the numbering stays stable.
 ### D7 — Knowledge lives in the atlas repo; the research repo gets one pointer line
 - **Why:** no generated bulk files in the research repo. A short pointer line in its `AGENTS.md` is acceptable.
   Global agent instruction files (`~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`) point to the atlas too, because an
-  `AGENTS.md` inside the atlas home isn't loaded when an agent starts in the research repo (architecture.md §6).
+  `AGENTS.md` inside the atlas home isn't loaded when an agent starts in the research repo (getting-started.md, step 5).
 
 ### D8 — Transcripts are leads; paths are verified; claims cite sources
 - **Why:** past agent statements can be wrong or out of date. Every path gets a status (`exists` / `missing` /
@@ -208,7 +208,8 @@ the original project.
   - A fixed set of questions with atomic rubrics and ground truth checked on disk: most need research history, a
     few are controls that don't.
   - Four arms that differ only in the standing instructions the agent sees: `none` (no atlas), `atlas` (the pointer
-    line), `dump` (an instruction to read every knowledge file in full first), `hint` (a folder hint only).
+    line, getting-started.md step 5), `dump` (an instruction to read every knowledge file in full first), `hint` (a
+    folder hint only).
   - Each agent runs as normally configured, fresh and non-persistent (D20), inside a read-only `bwrap` sandbox that
     replaces the on-disk instruction files per arm and hides the atlas from `none`/`hint` (transcript-formats.md, "Agent isolation for
     benchmarks").
