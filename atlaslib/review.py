@@ -91,7 +91,7 @@ def resolve(term, index):
 
 
 def cmd_mark_reviewed(cfg, args):
-    """Record sessions as covered by knowledge/ (docs/REFRESH.md step 5). Writes nothing on any error."""
+    """Record sessions as covered by knowledge/ (docs/refresh-guide.md step 5). Writes nothing on any error."""
     wp = work_paths(cfg)
     if not wp["sessions_index"].exists():
         print(f"error: {wp['sessions_index']} missing; run refresh first", file=sys.stderr)

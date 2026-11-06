@@ -1,4 +1,4 @@
-# 04 — MVP Specification
+# Architecture
 
 ## Goal
 
@@ -8,17 +8,16 @@ user**, can:
 2. know the caveats (authoritative references, known data problems, dev vs. validation data);
 3. know the relevant experiment history and decisions, including superseded conclusions, with sources it can follow.
 
-## Non-goals (MVP)
+## Non-goals
 
 SQLite, MCP, a reconciliation engine, scheduled or background scanning, full crawling of data mounts, code-graph
-tools, multi-project support beyond leaving room for it. See `06_future_work.md`.
+tools, multi-project support beyond leaving room for it. See [roadmap.md](roadmap.md).
 
 ## Layout
 
 ```
 ResearchAtlas/                    # source checkout; also the default atlas home when run from it
-├── AGENTS.md / CLAUDE.md         # "read docs/README.md first" + rules
-├── docs/                         # this docs set
+├── docs/                         # this documentation
 ├── pyproject.toml                # package metadata; installs the `researchatlas` command (D29)
 ├── atlas.py                      # `python atlas.py` from a checkout (thin shim, D23)
 ├── atlaslib/                     # core, extract, paths, refresh, review, find, copilot_import, cli
@@ -100,7 +99,7 @@ new_path_min_sessions = 1
 
 ### 1. `researchatlas extract [--force]`
 Reads Codex, Claude Code and GitHub Copilot transcripts and writes condensed per-session markdown plus a metadata
-index. Rules per source: 02, "Transcript parsing rules".
+index. Rules per source: transcript-formats.md, "Transcript parsing rules".
 
 - **Selection:** sessions whose cwd is under `[project].roots` or `cwd_also`; subagents/forks of selected sessions;
   plus sessions elsewhere whose condensed text mentions a `[project].roots` path. Excluded: `exclude_cwd`,
@@ -125,12 +124,12 @@ index. Rules per source: 02, "Transcript parsing rules".
   `n_sessions`, `n_mentions`, `session_ids` (newest first, capped at `max_session_ids`), `kind` (guess by extension:
   data, notebook, code, doc, config, figure, model; else `dir` or `other`).
 - **Verifies** each path with a per-path timeout in a helper subprocess (hard network mounts can hang): `status`
-  (`exists` | `missing` | `unreachable`), `is_dir`, `size`, `mtime`, `is_symlink`, `checked_at`, `error`. See 02,
+  (`exists` | `missing` | `unreachable`), `is_dir`, `size`, `mtime`, `is_symlink`, `checked_at`, `error`. See transcript-formats.md,
   "Path verification".
 - Output: `paths.jsonl`, plus a summary (counts by status, root and kind; top paths) on stdout. `--no-verify` keeps
   the previous verification fields.
 
-### Post-MVP: `researchatlas import-copilot <archive> [--extract]` (D24)
+### Copilot import: `researchatlas import-copilot <archive> [--extract]` (D24)
 - Receives a ZIP from `tools/copilot_sync.py` containing only `<hash>/workspace.json` and
   `<hash>/chatSessions/<uuid>.jsonl` entries.
 - Requires `[sources.copilot].chat_storage` to be `<atlas home>/work/copilot_import/workspaceStorage`.
@@ -160,7 +159,7 @@ handoff/summary documents and the experiment folders' READMEs/results. Related r
 known-missing ones `✗ <date>`, unverified leads `? lead`. Paths may be written with an abbreviation
 (`DP/experiments/run_01/`), defined in `[knowledge].abbreviations`.
 
-The repeatable incremental version of this step is `docs/prompts/incremental_update.md`.
+The repeatable incremental version of this step is `docs/prompts/incremental-update.md`.
 
 ### 4. `researchatlas refresh` and `researchatlas mark-reviewed`
 `refresh` runs `extract` and `paths` (their output captured), then prints a report. It writes no review state.
@@ -177,7 +176,7 @@ The repeatable incremental version of this step is `docs/prompts/incremental_upd
   `new_path_min_sessions` sessions, and not under a cited path (abbreviation roots cover only themselves), skipping
   `.git`, `__pycache__` and similar; top 30 (D18).
 
-The agent then updates `knowledge/` from the report (docs/prompts/incremental_update.md) and runs
+The agent then updates `knowledge/` from the report (docs/prompts/incremental-update.md) and runs
 `mark-reviewed --report <report>`, which records each listed session with the sha the report printed. Explicit ids
 (`<source>:<id prefix>` or a bare prefix) limit it to some sessions; `--note` stores a note. Any unknown, ambiguous
 or unlisted id aborts without writing (exit 2). A session that changed after the report stays pending.

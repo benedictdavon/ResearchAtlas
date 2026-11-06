@@ -81,7 +81,7 @@ def load_config(path=None):
 
 
 def work_paths(cfg):
-    """Locations of the generated intermediates (docs/04_mvp_spec.md, Layout)."""
+    """Locations of the generated intermediates (docs/architecture.md, Layout)."""
     w = cfg["project"]["work_dir"]
     return {
         "work": w,
@@ -166,13 +166,13 @@ def tidy_body(text):
 
 
 def truncate(text, limit):
-    """Cut text to limit chars and mark the cut (docs/04 §1, limits in config.toml)."""
+    """Cut text to limit chars and mark the cut (docs/architecture.md §1, limits in config.toml)."""
     if limit is None or len(text) <= limit:
         return text
     return text[:limit] + f" …[truncated {len(text) - limit} chars]"
 
 
-# Path body stops at whitespace, quotes, backticks, <>|,;{}[]*?$ (docs/02 D17), plus ':' and '\'
+# Path body stops at whitespace, quotes, backticks, <>|,;{}[]*?$ (docs/transcript-formats.md D17), plus ':' and '\'
 # (grep "file:line:" suffixes and JSON/JS escapes otherwise glue onto the path).
 PATH_STOP = "\\s\"'`<>|,;:{}\\[\\]*?$\\\\"
 # Parentheses are not stops: names like "1x1(iw612)" and "tier1a_feat_PCA_(10D).png" occur. A "(...)" group is
@@ -186,7 +186,7 @@ PATH_RE_TMPL = (
     r"(?:(?<=file://)|(?<![\w./-])|(?<=\\[ntr]))(?:{root})(?=/|[^\w.\-]|$)"
     r"(?:[^" + PATH_STOP + r"()]|" + PATH_GROUP + r"|(?<=\d-\d\d) \d\d[:_]\d\d[:_]\d\d)*"
 )
-# Kind guess by extension (docs/04_mvp_spec.md §2). Anything else: "dir" if verified as a
+# Kind guess by extension (docs/architecture.md §2). Anything else: "dir" if verified as a
 # directory, else "other".
 PATH_KINDS = [
     ("data", ".npy .npz .h5 .hdf5 .mat .csv .dat .pkl .pickle .parquet .feather .bin .json .txt .wav"),

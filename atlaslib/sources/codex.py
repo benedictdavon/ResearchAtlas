@@ -1,4 +1,7 @@
-"""Codex rollouts: discovery, classification, and condensing (docs/02: Codex rollout record format)."""
+"""Codex rollouts: discovery, classification, and condensing.
+
+See docs/transcript-formats.md: Codex rollout record format.
+"""
 
 import hashlib
 import json
@@ -66,7 +69,7 @@ def codex_meta(path):
 
 
 def codex_class(meta):
-    """Classify a session_meta payload per docs/02 (Transcript parsing rules)."""
+    """Classify a session_meta payload per docs/transcript-formats.md (Transcript parsing rules)."""
     src = meta.get("source")
     sub = src.get("subagent") if isinstance(src, dict) else None
     if isinstance(sub, dict) and sub.get("other") == "guardian":
@@ -119,7 +122,7 @@ def text_of(output):
 
 
 def codex_user_part(text, lim):
-    """Classify one user input_text part: (label, text) or None if injected (docs/02)."""
+    """Classify one user input_text part: (label, text) or None if injected (docs/transcript-formats.md)."""
     s = text.lstrip()
     if s.startswith(INJECTED_CODEX):
         return None
@@ -242,7 +245,7 @@ def payload_hashes(path):
 
 
 def codex_record(st, typ, pl, ts, lim):
-    """Dispatch one non-inherited Codex record (docs/02: what to keep / what to scan)."""
+    """Dispatch one non-inherited Codex record (docs/transcript-formats.md: what to keep / what to scan)."""
     if typ == "response_item":
         pt = pl.get("type")
         if pt == "message":

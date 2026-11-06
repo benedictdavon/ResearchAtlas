@@ -4,7 +4,7 @@ Use this after new research work (Codex, Claude Code or GitHub Copilot sessions)
 The `researchatlas` CLI does the mechanical part (indexing transcripts, checking paths). An agent does the understanding part
 (updating the knowledge files). You review the result once.
 
-Commands run in the atlas home (here `/home/user/.researchatlas`; see `docs/04_mvp_spec.md`, Configuration) with
+Commands run in the atlas home (here `/home/user/.researchatlas`; see `docs/architecture.md`, Configuration) with
 Python 3.11+. From a source checkout, `python atlas.py` works in place of `researchatlas`. Examples use
 `demo_project` as the project name; substitute `[project].name` / `work_dir` from your `config.toml`.
 
@@ -83,7 +83,7 @@ If there are no new sessions and no broken paths, stop here.
 
 **3. Have an agent update the knowledge files.** Start Claude Code, Codex or Copilot **in the atlas home** and
 say:
-> Follow `docs/prompts/incremental_update.md` with the report `work/demo_project/refresh_<YYYYMMDD>.txt`.
+> Follow `docs/prompts/incremental-update.md` with the report `work/demo_project/refresh_<YYYYMMDD>.txt`.
 
 The agent reads the new sessions, checks the experiment folders' own result files (sessions are leads, not truth),
 updates `datasets.md`, the `experiments_<track>.md` files, `recipes.md`, `decisions.md` and `open_questions.md` with

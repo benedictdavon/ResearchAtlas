@@ -1,4 +1,4 @@
-"""GitHub Copilot transcript source for ResearchAtlas (docs/02, "GitHub Copilot history").
+"""GitHub Copilot transcript source for ResearchAtlas (docs/transcript-formats.md, "GitHub Copilot history").
 
 Inputs, configured under [sources.copilot]:
   chat_dirs       VS Code Chat panel op logs, <dir>/<uuid>.jsonl            kind "chat"
@@ -76,8 +76,8 @@ CANON = {
     "task": "agent",
     "ask_user": "ask",
 }
-# No bullet: bookkeeping, polling and memory tools (docs/02: noise). read_agent only polls a subagent; its report
-# comes from the subagent's completion (see event_record).
+# No bullet: bookkeeping, polling and memory tools (docs/transcript-formats.md: Noise). read_agent only polls a
+# subagent; its report comes from the subagent's completion (see event_record).
 SILENT_TOOLS = {
     "manage_todo_list",
     "tool_search",
@@ -756,7 +756,10 @@ def _flush_turn(st, lim):
 
 
 def event_record(st, typ, data, ts, lim):
-    """Dispatch one events record (docs/02: Copilot events). Subagent-owned records are scanned only."""
+    """Dispatch one events record (docs/transcript-formats.md: Copilot events).
+
+    Subagent-owned records are scanned only.
+    """
     sub = bool(data.get("parentToolCallId"))
     if typ == "session.start":
         ctx = data.get("context") if isinstance(data.get("context"), dict) else {}

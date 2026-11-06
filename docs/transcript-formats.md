@@ -1,8 +1,8 @@
-# 02 — Transcript Formats and Parsing Rules
+# Transcript formats and parsing rules
 
 Generic, reusable facts about where coding agents store their transcripts, what the records look like, and
 which rules `researchatlas extract` implements. Code docstrings refer to the section names below
-(e.g. "docs/02: Transcript parsing rules", "docs/02: Tool inputs").
+(e.g. "docs/transcript-formats.md: Transcript parsing rules", "docs/transcript-formats.md: Tool inputs").
 
 These formats are **observed, not documented by the vendors**, and they change between versions. Codex CLI rollouts
 from roughly version 0.117 to 0.161 were inspected; shapes differ by version, so the parser relies only on records
@@ -188,7 +188,7 @@ Copilot keeps history in several places, depending on which client produced it (
 
 | | Location | Producer | Content | Read as (`kind`) |
 |---|---|---|---|---|
-| A | Client PC: `%APPDATA%\Code\User\workspaceStorage\<hash>\chatSessions\<uuid>.jsonl` (copied to the server, see REFRESH.md step 0) | VS Code Chat panel | op log (below): prompts, replies, tool args, tool results | `chat` |
+| A | Client PC: `%APPDATA%\Code\User\workspaceStorage\<hash>\chatSessions\<uuid>.jsonl` (copied to the server, see refresh-guide.md step 0) | VS Code Chat panel | op log (below): prompts, replies, tool args, tool results | `chat` |
 | B | `~/.copilot/session-state/<uuid>/events.jsonl` (+ `workspace.yaml`, `session.db`, `checkpoints/`) | Copilot agent runtime (CLI / SDK / VS Code agent host) | event log with tool results | `agent` (only `events.jsonl` is read; the other files may hold credentials) |
 | C | `~/.vscode-server/data/User/workspaceStorage/<hash>[-N]/GitHub.copilot-chat/transcripts/<uuid>.jsonl` | VS Code Chat panel (server-side mirror) | B's event schema without tool results (`success` only) | `transcript` |
 | D | `~/.vscode-server/data/agentSessionData/<id>/session.db` (+ `attachments/`) | VS Code agent-host UI store | SQLite turns, file edits, terminal outputs | not read (redundant with Codex rollouts or B) |

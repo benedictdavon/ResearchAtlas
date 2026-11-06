@@ -47,7 +47,7 @@ CITE_PATH_END_RE = re.compile(r"(?:[^ ]|(?<=\d-\d\d) \d\d[:_]\d\d[:_]\d\d)+")
 
 
 def expand_cited(span, abbrev):
-    """Absolute path for one backtick span from knowledge/*.md, or None (docs/04 §4 step 3b)."""
+    """Absolute path for one backtick span from knowledge/*.md, or None (docs/architecture.md §4 step 3b)."""
     s = span.split(" (", 1)[0].strip()
     if not s or any(c in s for c in CITE_TEMPLATE_CHARS) or any(t in s for t in CITE_TEMPLATE_TOKENS):
         return None
@@ -124,7 +124,7 @@ def new_frequent_paths(rows, cited, roots, min_sessions, old_paths):
 
 
 def print_sessions(title, items, home=None):
-    """One line per session; `sha=` is what mark-reviewed --report records (docs/REFRESH.md step 5)."""
+    """One line per session; `sha=` is what mark-reviewed --report records (docs/refresh-guide.md step 5)."""
     print(f"{title}: {len(items)}")
     for rec, sha, size, row in items:
         start = (rec.get("start") or "—")[:16].replace("T", " ")
@@ -161,7 +161,7 @@ def atlas_feedback(path):
 
 
 def cmd_refresh(cfg, args):
-    """Run extract + paths, then report what needs review (docs/04 §4). Exit 0 unless an internal error."""
+    """Run extract + paths, then report what needs review (docs/architecture.md §4). Exit 0 unless an internal error."""
     wp = work_paths(cfg)
     rc, out = run_quiet(cmd_extract, cfg, argparse.Namespace(force=False))
     if rc:
@@ -238,7 +238,7 @@ def cmd_refresh(cfg, args):
 
     print()
     print(
-        f"Next: update {cfg['project']['knowledge_dir']}/ from this report (docs/prompts/incremental_update.md), "
+        f"Next: update {cfg['project']['knowledge_dir']}/ from this report (docs/prompts/incremental-update.md), "
         "then: researchatlas mark-reviewed --report <this report>"
     )
     return 0

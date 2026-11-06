@@ -1,4 +1,7 @@
-"""Claude Code transcripts: sessions, subagent files, and condensing (docs/02: Transcript parsing rules)."""
+"""Claude Code transcripts: sessions, subagent files, and condensing.
+
+See docs/transcript-formats.md: Transcript parsing rules.
+"""
 
 from pathlib import Path
 
@@ -47,7 +50,7 @@ def claude_flush(st, buf, cwd_default, lim):
 
 
 def claude_tool_bullets(st, ts, name, inp, cwd, lim):
-    """Bullets for one Claude tool_use (docs/02: Tool inputs); SubagentHandback becomes a report."""
+    """Bullets for one Claude tool_use (docs/transcript-formats.md: Tool inputs); SubagentHandback becomes a report."""
     if not isinstance(inp, dict):
         inp = {}
     scan_obj(inp, st["rx"], st["hits"])
@@ -71,7 +74,10 @@ def claude_tool_bullets(st, ts, name, inp, cwd, lim):
 
 
 def claude_user_record(st, rec, subagent, lim):
-    """Human prompts, the subagent task, and tool_result scanning (docs/02: Claude what to keep)."""
+    """Human prompts, the subagent task, and tool_result scanning.
+
+    See docs/transcript-formats.md: Claude Code: what to keep.
+    """
     msg = rec.get("message") or {}
     c = msg.get("content")
     origin = (rec.get("origin") or {}).get("kind")
@@ -144,7 +150,7 @@ def claude_condense(path, subagent, rx, rx_proj, lim, body_path):
 
 
 def claude_first_cwd(path):
-    """cwd of the first record that has one (docs/02: session cwd)."""
+    """cwd of the first record that has one (docs/transcript-formats.md: session cwd)."""
     for n, rec in walk_jsonl(path):
         if rec.get("cwd"):
             return rec["cwd"]

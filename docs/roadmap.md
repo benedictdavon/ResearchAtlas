@@ -1,7 +1,7 @@
-# 06 — Future Work (optional, deferred)
+# Roadmap
 
-None of these are part of the MVP. Build one only when its **trigger** actually happens, and record the decision
-in 03.
+Deferred components, each with the **trigger** that would justify building it. A component is built only when its
+trigger actually happens, and the decision is recorded in [design-decisions.md](design-decisions.md).
 
 | Component | What it would add | Trigger to build it |
 |-----------|-------------------|---------------------|
@@ -15,13 +15,13 @@ in 03.
 | **Code/document graph** | Relationship graph (scripts ↔ loaders ↔ reports) | Recurring questions about *code* relationships that grep and agents answer poorly. Evaluate against the working atlas first |
 | **Multi-project support** | More `projects/<name>/` entries | A second repo needs coverage. The layout already allows it; config currently describes one project |
 | **Codex native memories** | Use Codex's own `memories/` feature as a cache | It proves useful alongside the atlas |
-| **More Copilot Chat workspaces** | Chat history of further client workspaces | Questions about work done there; add another `--root` to the uploader or a `chat_dirs` entry (REFRESH.md step 0) |
+| **More Copilot Chat workspaces** | Chat history of further client workspaces | Questions about work done there; add another `--root` to the uploader or a `chat_dirs` entry (refresh-guide.md step 0) |
 | **Incremental Copilot upload** | Transfer only changed chat logs | Full-snapshot uploads (D24) become too slow or large |
-| **Compaction history scanning** | Harvest paths from Codex `compacted.replacement_history` / `retained_context` | Path-recall audits show meaningful misses there (02, "Path harvesting") |
+| **Compaction history scanning** | Harvest paths from Codex `compacted.replacement_history` / `retained_context` | Path-recall audits show meaningful misses there (transcript-formats.md, "Path harvesting") |
 
 Principle (D2): every component must fix a limit that was actually observed in use.
 
-## Built since the MVP
+## Built after the first version
 
 - **GitHub Copilot source** (D22, D23): Chat-panel op logs, Copilot agent sessions and server-side transcripts, in
   `atlaslib/sources/copilot.py`. The VS Code agent-host store (`agentSessionData/*/session.db`) is deliberately not

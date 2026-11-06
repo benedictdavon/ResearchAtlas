@@ -1,7 +1,7 @@
 # Incremental update prompt (after `researchatlas refresh`)
 
-Used for step 3 of `docs/REFRESH.md`. The user starts an agent in the atlas home and says:
-"Follow `docs/prompts/incremental_update.md` with the report `work/<project>/refresh_<YYYYMMDD>.txt`."
+Used for step 3 of `docs/refresh-guide.md`. The user starts an agent in the atlas home and says:
+"Follow `docs/prompts/incremental-update.md` with the report `work/<project>/refresh_<YYYYMMDD>.txt`."
 
 Below, `<project>` is `[project].name` from `config.toml`, the knowledge folder is `projects/<project>/knowledge/`
 and the condensed transcripts are in `work/<project>/sessions/`.
@@ -11,7 +11,7 @@ and the condensed transcripts are in `work/<project>/sessions/`.
 You are updating the ResearchAtlas knowledge files from a refresh report.
 
 **Read first.** `AGENTS.md` (if present), then:
-- `docs/03_decisions.md` D13 (trust order), D15/D22 (citation ids), D16/D20 (excluded sessions), D25 (review ledger);
+- `docs/design-decisions.md` D13 (trust order), D15/D22 (citation ids), D16/D20 (excluded sessions), D25 (review ledger);
 - `projects/<project>/knowledge/INDEX.md`;
 - the refresh report named by the user.
 

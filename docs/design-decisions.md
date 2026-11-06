@@ -1,10 +1,10 @@
-# 03 — Decision Log
+# Design decisions
 
 Format: decision · alternatives considered · why. Code comments cite these numbers. Don't reopen a decision
 without new evidence; to change one, add a new entry that supersedes it.
 
-Numbers are kept from the original project's log. Entries that only concerned the original project's data are
-reduced to a one-line generic summary.
+ResearchAtlas was first built for one research project; entries that only concerned that project's data are
+reduced to a one-line summary so the numbering stays stable.
 
 ### D1 — Hybrid evidence-based approach; code-graph tools deferred
 - **Alternatives:** documentation only; a code/document graph tool as the foundation; transcript mining only.
@@ -12,16 +12,16 @@ reduced to a one-line generic summary.
   Transcripts alone aren't trustworthy. Combine transcript mining, verification against the filesystem, and
   markdown knowledge files.
 
-### D2 — MVP first; every extra component optional
+### D2 — Smallest useful version first; every extra component optional
 - **Alternatives:** a multi-phase plan with SQLite, an MCP server, a reconciliation engine, scheduled scanners.
 - **Why:** the real cost is checking extraction quality, not writing code, and each extra component adds failure
-  modes. Build what every option needs, use it, and add components only when a real limit appears (06). Don't build
+  modes. Build what every option needs, use it, and add components only when a real limit appears (roadmap.md). Don't build
   stubs or placeholders for deferred parts.
 
 ### D3 — Markdown knowledge files, not SQLite
 - **Why:** expected volume is at most a few hundred records. Agents read markdown natively, grep is enough, and git
   diffs make review easy. Structured metadata that already lives in a project database stays there. Revisit if
-  grep/markdown stops scaling (06).
+  grep/markdown stops scaling (roadmap.md).
 
 ### D4 — No MCP server; CLI + markdown
 - **Why:** Codex, Claude Code and Copilot agents all have a shell. MCP adds value only for shell-less clients,
@@ -41,7 +41,7 @@ reduced to a one-line generic summary.
 ### D7 — Knowledge lives in the atlas repo; the research repo gets one pointer line
 - **Why:** no generated bulk files in the research repo. A short pointer line in its `AGENTS.md` is acceptable.
   Global agent instruction files (`~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`) point to the atlas too, because an
-  `AGENTS.md` inside the atlas folder isn't loaded when an agent starts in the research repo (04 §6).
+  `AGENTS.md` inside the atlas home isn't loaded when an agent starts in the research repo (architecture.md §6).
 
 ### D8 — Transcripts are leads; paths are verified; claims cite sources
 - **Why:** past agent statements can be wrong or out of date. Every path gets a status (`exists` / `missing` /
@@ -85,14 +85,14 @@ Higher ranks win conflicts. Within a rank, newer evidence wins. Material conflic
 ### D16 — Skip guardian rollouts and the atlas's own sessions
 - **Guardian** rollouts (`source.subagent.other == "guardian"`) are approval reviewers that re-paste parts of the
   parent transcript. Extracting them would duplicate content and mislabel it as user text.
-- **Atlas sessions** (cwd under the atlas folder, `[project].exclude_cwd`) mention project paths but are about
+- **Atlas sessions** (cwd under the atlas home, `[project].exclude_cwd`) mention project paths but are about
   building the atlas. They are excluded from selection to avoid circular evidence.
 
 ### D17 — `extract` records per-session path hits; `paths` aggregates and verifies
 - **Why:** transcripts can total close to a gigabyte; parsing them once avoids a second full pass. `extract` scans all
   content (incl. tool outputs) for absolute paths under the configured roots and writes per-session hits to
   `work/<project>/pathhits/<source>_<shortid>.json`. `paths` aggregates them into `paths.jsonl` and verifies each
-  with a timeout. Stop characters: 02, "Path harvesting".
+  with a timeout. Stop characters: transcript-formats.md, "Path harvesting".
 
 ### D18 — refresh "new paths" = not in the previous `paths.jsonl`
 - **Alternatives:** `last_seen` after a watermark (one live session re-surfaces thousands of paths); `first_seen`
@@ -122,7 +122,7 @@ the original project.
 
 ### D22 — GitHub Copilot is a third transcript source
 - **Why:** much research work happens in the VS Code Copilot Chat panel, which Codex/Claude transcripts don't cover.
-  Locations and formats: 02, "GitHub Copilot history".
+  Locations and formats: transcript-formats.md, "GitHub Copilot history".
 - **Inputs** (`[sources.copilot]`): A = Chat-panel op logs copied from the client PC (`chat_dirs`, each with its
   workspace folder; `chat_storage`, the uploader mirror, D24), B = Copilot agent sessions (`agent_state`,
   `<id>/events.jsonl`), C = server-side Chat transcripts (`vscode_storage`; cwd from `workspace.json`, else the
@@ -208,10 +208,10 @@ the original project.
   - A fixed set of questions with atomic rubrics and ground truth checked on disk: most need research history, a
     few are controls that don't.
   - Four arms that differ only in the standing instructions the agent sees: `none` (no atlas), `atlas` (the pointer
-    line of 04 §6), `dump` (the knowledge files placed directly into the instructions), `hint` (a folder hint
+    line of architecture.md §6), `dump` (the knowledge files placed directly into the instructions), `hint` (a folder hint
     only).
   - Each agent runs as normally configured, fresh and non-persistent (D20), inside a read-only `bwrap` sandbox that
-    replaces the on-disk instruction files per arm and hides the atlas from `none`/`hint` (02, "Agent isolation for
+    replaces the on-disk instruction files per arm and hides the atlas from `none`/`hint` (transcript-formats.md, "Agent isolation for
     benchmarks").
   - Primary metric: total tokens incl. subagents. Also cost, wall time, a blind LLM rubric grade and invented paths.
   - Analysis per question (geometric mean of arm/none over repetitions), bootstrapped over questions.

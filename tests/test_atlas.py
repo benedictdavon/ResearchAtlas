@@ -1,7 +1,7 @@
 """Regression tests for ResearchAtlas: the documented parsing, selection, path and citation rules.
 
-The spec is docs/02_transcript_formats.md ("Transcript parsing rules", "Extraction and path facts"),
-docs/03_decisions.md (D15-D20) and docs/04_mvp_spec.md (sections 1-5). Tests describe those rules.
+The spec is docs/transcript-formats.md ("Transcript parsing rules", "Extraction and path facts"),
+docs/design-decisions.md (D15-D20) and docs/architecture.md (sections 1-5). Tests describe those rules.
 They don't snapshot what the code happens to do.
 
 Only synthetic transcripts in temporary directories are used. Nothing under ~/.codex, ~/.claude,
@@ -255,7 +255,7 @@ def cl_tool_result(text, tool_use_result=None):
 
 class CodexUserTextTests(unittest.TestCase):
     def test_injected_parts_are_dropped(self):
-        # docs/02 "Codex: what to keep", user text drop list.
+        # docs/transcript-formats.md "Codex: what to keep", user text drop list.
         injected = [
             "# AGENTS.md instructions for /home/user\n\nsome repo rules",
             "<environment_context>\n  <cwd>/x</cwd>\n</environment_context>",
@@ -295,7 +295,7 @@ class CodexUserTextTests(unittest.TestCase):
         self.assertEqual(codex_user_part("What is the pilot dataset?", LIMITS), ("USER", "What is the pilot dataset?"))
 
     def test_question_reply_is_kept_as_user_text(self):
-        # docs/02 keeps the user's answers to the agent's questions.
+        # docs/transcript-formats.md keeps the user's answers to the agent's questions.
         text = "<send_user_message_question_reply>\nYes, use night 2\n</send_user_message_question_reply>"
         self.assertEqual(codex_user_part(text, LIMITS), ("USER", text))
 
@@ -306,7 +306,7 @@ class CodexUserTextTests(unittest.TestCase):
 
 
 def root_rollout():
-    """A root session with every record kind the parser must keep or drop (docs/02 Codex lists)."""
+    """A root session with every record kind the parser must keep or drop (docs/transcript-formats.md Codex lists)."""
     return [
         cx_meta(CX_ROOT, cwd=ROOT_DP),
         cx_msg("developer", "DEVELOPER_SECRET sandbox policy"),
@@ -373,7 +373,7 @@ class CodexCondenseTests(TempAtlasCase):
         self.assertIn("### 2026-10-10 10:05 AGENT\nListing the recording folder first.", body)
 
     def test_partial_last_line_is_skipped(self):
-        # docs/02: live files can end in a partial line; the earlier records must still be condensed.
+        # docs/transcript-formats.md: live files can end in a partial line; the earlier records must still be condensed.
         records = root_rollout()
         path = self.write_codex_rollout(records)
         with open(path, "a", encoding="utf-8") as fh:
@@ -383,7 +383,8 @@ class CodexCondenseTests(TempAtlasCase):
         self.assertIn("The 0920 folder is the 5-1 room recording.", out.read_text(encoding="utf-8"))
 
     def test_compaction_summary_is_skipped_when_already_in_an_agent_message(self):
-        # docs/02: skip compacted.message if its first 200 chars already appeared in an emitted assistant message.
+        # docs/transcript-formats.md: skip compacted.message if its first 200 chars already appeared in an emitted
+        # assistant message.
         summary = "Summary of the session so far: " + "x" * 220
         records = [
             cx_meta(CX_ROOT),
@@ -444,7 +445,7 @@ class CodexToolInputTests(TempAtlasCase):
 
 
 # ---------------------------------------------------------------------------
-# 3. Codex fork and subagent rules (docs/02: session classes)
+# 3. Codex fork and subagent rules (docs/transcript-formats.md: session classes)
 # ---------------------------------------------------------------------------
 
 
@@ -689,7 +690,7 @@ class ClaudeSubagentAndRecapTests(TempAtlasCase):
         self.assertIn(NAS_RECORDING_HHMMSS, st["hits"])
 
     def test_original_file_and_patch_fields_are_not_scanned(self):
-        # docs/02: skip originalFile / structuredPatch when scanning tool results.
+        # docs/transcript-formats.md: skip originalFile / structuredPatch when scanning tool results.
         tur = {
             "file": {"content": "ok", "originalFile": "/mnt/nas_data/ORIGINAL_ONLY.npy"},
             "structuredPatch": [{"lines": ["/mnt/nas_data/PATCH_ONLY.npy"]}],
@@ -819,7 +820,7 @@ class SelectionTests(TempAtlasCase):
         self.assertEqual(sel[("claude", "abcdef12-0000-4000-8000-000000000002")], "parent")
 
     def test_discover_candidates_takes_claude_subagent_parent_from_its_folder(self):
-        # docs/02: subagents live in <projdir>/<sid>/subagents/agent-<agentId>.jsonl.
+        # docs/transcript-formats.md: subagents live in <projdir>/<sid>/subagents/agent-<agentId>.jsonl.
         proj = self.tmp / "claude" / "projects" / "-home-user-research-demo_project"
         sid = "9f1e2d3c-0000-4000-8000-000000000001"
         dump_jsonl(proj / f"{sid}.jsonl", [cl_user("hi")])
@@ -853,7 +854,7 @@ class PathHarvestTests(unittest.TestCase):
         return hits
 
     def test_recording_folder_with_space_is_kept_whole(self):
-        # docs/02: recording folders are named "YYYY-MM-DD HH:MM:SS" (or HH_MM_SS).
+        # docs/transcript-formats.md: recording folders are named "YYYY-MM-DD HH:MM:SS" (or HH_MM_SS).
         self.assertEqual(set(self.harvest("saved to " + NAS_RECORDING + " and then")), {NAS_RECORDING})
         self.assertEqual(set(self.harvest("see " + NAS_RECORDING_HHMMSS + ".")), {NAS_RECORDING_HHMMSS})
 
@@ -1055,7 +1056,7 @@ class CitedPathsTests(TempAtlasCase):
         )
 
     def test_spans_followed_by_cross_mark_are_skipped(self):
-        # docs/04 §4: ✗-marked citations are known-missing and are not re-reported.
+        # docs/architecture.md §4: ✗-marked citations are known-missing and are not re-reported.
         self.write_knowledge(
             "datasets.md",
             "- gone: `EXP/rec_export_29990101_000000` ✗ 2026-10-22\n"

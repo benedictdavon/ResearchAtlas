@@ -51,15 +51,15 @@ Working from a clone instead? `python atlas.py <command>` runs the same CLI, and
 home, so `config.toml`, `work/` and `projects/` sit next to the code (all gitignored).
 
 Then have an agent write `projects/<project>/knowledge/` in the atlas home from the condensed sessions and verified paths. The format
-and rules are in [docs/04_mvp_spec.md](docs/04_mvp_spec.md) §3. Once the knowledge exists, keep it current:
+and rules are in [docs/architecture.md](docs/architecture.md) §3. Once the knowledge exists, keep it current:
 
 ```bash
 researchatlas refresh | tee work/<project>/refresh_$(date +%Y%m%d).txt   # sessions to review, broken cited paths, new paths
-# an agent applies the report to knowledge/ (docs/prompts/incremental_update.md), then:
+# an agent applies the report to knowledge/ (docs/prompts/incremental-update.md), then:
 researchatlas mark-reviewed --report work/<project>/refresh_<YYYYMMDD>.txt
 ```
 
-See [docs/REFRESH.md](docs/REFRESH.md) for the full workflow.
+See [docs/refresh-guide.md](docs/refresh-guide.md) for the full workflow.
 
 ### Point your agents at it
 
@@ -85,7 +85,7 @@ python tools/copilot_sync.py --root /home/user/research/demo_project --upload --
 
 ## Does it help? (benchmark summary)
 
-A sandboxed four-arm benchmark (method in [docs/03_decisions.md](docs/03_decisions.md), D28) ran Claude Code and
+A sandboxed four-arm benchmark (method in [docs/design-decisions.md](docs/design-decisions.md), D28) ran Claude Code and
 Codex non-interactively on 9 research questions about a real project, plus 2 control questions. The arms were:
 - `none`: no atlas
 - `atlas`: the pointer line
