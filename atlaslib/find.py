@@ -4,6 +4,7 @@ Knowledge files are matched per section (a heading through the next heading), so
 different lines of one entry; the heading path counts as part of the section. Sessions are matched per
 message and summarised per file. Results are ranked; --limit counts sections / paths / session files.
 """
+
 import os
 import re
 import sys
@@ -25,7 +26,7 @@ def snippet(line, words):
     found = [i for i in (low.find(w) for w in words) if i >= 0]
     pos = min(found) if found else 0
     start = max(0, min(pos - 60, len(text) - FIND_WIDTH))
-    body = text[start:start + FIND_WIDTH]
+    body = text[start : start + FIND_WIDTH]
     if start > 0:
         body = "…" + body[1:]
     if start + FIND_WIDTH < len(text):
@@ -77,8 +78,15 @@ def find_knowledge(kdir, words):
                 continue
             full, partial = score_lines(body, words)
             best = sorted(partial, key=lambda x: (-x[0], x[1]))[:LINES_PER_SECTION]
-            hits.append(((-full, -sum(k for k, _, _ in partial), rel, start), rel, start, path,
-                         sorted(best, key=lambda x: x[1])))
+            hits.append(
+                (
+                    (-full, -sum(k for k, _, _ in partial), rel, start),
+                    rel,
+                    start,
+                    path,
+                    sorted(best, key=lambda x: x[1]),
+                )
+            )
     hits.sort(key=lambda h: h[0])
     return hits
 
@@ -137,12 +145,14 @@ def cmd_find(cfg, args):
     paths = find_paths(wp["paths"], words)
     sess = find_sessions(wp["sessions_dir"], words)
     if not (know or paths or sess):
-        print(f"No match for '{' '.join(args.term)}' in the atlas. "
-              "Don't guess a path; ask the user or search the filesystem.")
+        print(
+            f"No match for '{' '.join(args.term)}' in the atlas. "
+            "Don't guess a path; ask the user or search the filesystem."
+        )
         return 0
     if know:
         print(f"== knowledge: {len(know)} matching sections (best first)")
-        for _, rel, start, path, best in know[:args.limit]:
+        for _, rel, start, path, best in know[: args.limit]:
             shown = path[1:] if len(path) > 1 else path  # the file's title heading is implied by the file name
             print(f"  {rel}:{start}  {' > '.join(shown) or '(top of file)'}")
             for _, n, text in best:
@@ -150,12 +160,12 @@ def cmd_find(cfg, args):
         more(len(know), args.limit)
     if paths:
         print(f"== paths.jsonl: {len(paths)} matching paths (existing first, most sessions first)")
-        for r in paths[:args.limit]:
+        for r in paths[: args.limit]:
             print(f"  {r.get('path')}  status={r.get('status')} n_sessions={r.get('n_sessions')}")
         more(len(paths), args.limit)
     if sess:
         print(f"== sessions: {len(sess)} matching transcripts (leads, not verified; most matches first)")
-        for _, rel, title, n_msgs, (n, text) in sess[:args.limit]:
+        for _, rel, title, n_msgs, (n, text) in sess[: args.limit]:
             print(f"  {title}  [{n_msgs} msg]")
             print(f"      {rel}:{n}  {snippet(text, words)}")
         more(len(sess), args.limit)

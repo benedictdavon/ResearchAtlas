@@ -5,12 +5,13 @@ One row per reviewed session in `[project].review_ledger` (committed next to kno
 `sha`/`bytes` describe the condensed transcript that was reviewed (null: the session had no condensed text).
 A session is pending when it has no row, or its condensed text no longer matches the reviewed sha.
 """
+
 import hashlib
 import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from atlaslib.core import ATLAS_DIR, read_jsonl, work_paths
@@ -99,8 +100,9 @@ def cmd_mark_reviewed(cfg, args):
     terms = list(args.ids)
     if not terms:
         if report is None:
-            print("error: give session ids, or --report <refresh report> to mark every session it lists",
-                  file=sys.stderr)
+            print(
+                "error: give session ids, or --report <refresh report> to mark every session it lists", file=sys.stderr
+            )
             return 2
         terms = list(report)
 
@@ -126,7 +128,7 @@ def cmd_mark_reviewed(cfg, args):
 
     ledger_path = cfg["project"]["review_ledger"]
     ledger = load_ledger(ledger_path)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     stale, unchanged = [], 0
     for key in sorted(chosen):
         sha, size = condensed_digest(index[key])
@@ -138,11 +140,18 @@ def cmd_mark_reviewed(cfg, args):
         if old and old.get("sha") == sha and not args.note:
             unchanged += 1
             continue
-        ledger[key] = {"session": key, "reviewed": today, "sha": sha, "bytes": size,
-                       "note": args.note or (old or {}).get("note", "")}
+        ledger[key] = {
+            "session": key,
+            "reviewed": today,
+            "sha": sha,
+            "bytes": size,
+            "note": args.note or (old or {}).get("note", ""),
+        }
     save_ledger(ledger_path, ledger)
-    print(f"marked {len(chosen) - unchanged} session(s) reviewed ({unchanged} already up to date) "
-          f"in {os.path.relpath(ledger_path, ATLAS_DIR)}")
+    print(
+        f"marked {len(chosen) - unchanged} session(s) reviewed ({unchanged} already up to date) "
+        f"in {os.path.relpath(ledger_path, ATLAS_DIR)}"
+    )
     for key in stale:
         print(f"  note: {key} changed after the report was written; it stays pending for its new content")
     return 0

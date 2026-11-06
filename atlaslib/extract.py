@@ -1,4 +1,5 @@
 """extract: condense Codex/Claude/Copilot transcripts into work/<project>/sessions and index them (docs/04 §1)."""
+
 import json
 import os
 import sys
@@ -107,8 +108,9 @@ def write_condensed(c, st, title, out_path, cwd, cli):
         fh.write(f"- kind: {c['kind']} · source: {c['source']} · cli: {cli or '—'}\n")
         fh.write(f"- id: {c['id']} · parent: {c['parent_id'] or '—'}\n")
         fh.write(f"- cwd: {cwd or '—'}\n")
-        fh.write(f"- start: {_iso(st['start']) if st['start'] else '—'} · "
-                 f"end: {_iso(st['end']) if st['end'] else '—'}\n")
+        fh.write(
+            f"- start: {_iso(st['start']) if st['start'] else '—'} · end: {_iso(st['end']) if st['end'] else '—'}\n"
+        )
         fh.write(f"- raw: {c['path']} ({size_mb:.2f} MB)\n\n")
         with open(st["body"], encoding="utf-8") as body:
             for line in body:
@@ -119,9 +121,14 @@ def write_condensed(c, st, title, out_path, cwd, cli):
 def write_pathhits(c, st, pathhits_dir):
     """Per-session path hits for the paths worker (docs/04 §2, D17)."""
     out = pathhits_dir / f"{c['source']}_{c['short']}.json"
-    obj = {"source": c["source"], "id": c["id"], "short_id": c["short"],
-           "start": _iso(st["start"]) if st["start"] else None,
-           "end": _iso(st["end"]) if st["end"] else None, "hits": st["hits"]}
+    obj = {
+        "source": c["source"],
+        "id": c["id"],
+        "short_id": c["short"],
+        "start": _iso(st["start"]) if st["start"] else None,
+        "end": _iso(st["end"]) if st["end"] else None,
+        "hits": st["hits"],
+    }
     tmp = out.with_name("." + out.name + ".tmp")
     with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(obj, fh, ensure_ascii=False, indent=1, sort_keys=True)
@@ -141,13 +148,24 @@ def finalize(c, st, sel_by, ctx):
     if st["body"].exists():
         os.remove(st["body"])
     write_pathhits(c, st, ctx["pathhits_dir"])
-    return {"source": c["source"], "id": c["id"], "short_id": c["short"], "kind": c["kind"],
-            "parent_id": c["parent_id"], "cwd": cwd,
-            "start": _iso(st["start"]) if st["start"] else None,
-            "end": _iso(st["end"]) if st["end"] else None,
-            "title": title, "n_user_msgs": st["n_user"], "selected_by": sel_by,
-            "condensed_path": condensed, "raw_path": str(c["path"]), "raw_size": c["size"],
-            "raw_mtime": c["mtime"], "cli_version": cli}
+    return {
+        "source": c["source"],
+        "id": c["id"],
+        "short_id": c["short"],
+        "kind": c["kind"],
+        "parent_id": c["parent_id"],
+        "cwd": cwd,
+        "start": _iso(st["start"]) if st["start"] else None,
+        "end": _iso(st["end"]) if st["end"] else None,
+        "title": title,
+        "n_user_msgs": st["n_user"],
+        "selected_by": sel_by,
+        "condensed_path": condensed,
+        "raw_path": str(c["path"]),
+        "raw_size": c["size"],
+        "raw_mtime": c["mtime"],
+        "cli_version": cli,
+    }
 
 
 def remove_stale(folder, keep, pattern):
@@ -163,13 +181,19 @@ def cmd_extract(cfg, args):
     """Condense Codex/Claude/Copilot transcripts into work/<project>/sessions and index them (docs/04 §1)."""
     t0 = time.time()
     wp = work_paths(cfg)
-    ctx = {"sessions_dir": wp["sessions_dir"], "pathhits_dir": wp["pathhits_dir"],
-           "rx": path_regex(cfg["paths"]["roots"]), "rx_proj": path_regex(cfg["project"]["roots"]),
-           "lim": cfg["limits"]}
+    ctx = {
+        "sessions_dir": wp["sessions_dir"],
+        "pathhits_dir": wp["pathhits_dir"],
+        "rx": path_regex(cfg["paths"]["roots"]),
+        "rx_proj": path_regex(cfg["project"]["roots"]),
+        "lim": cfg["limits"],
+    }
     ctx["sessions_dir"].mkdir(parents=True, exist_ok=True)
     ctx["pathhits_dir"].mkdir(parents=True, exist_ok=True)
     unsel_path = wp["work"] / "unselected.jsonl"
-    prev = {(r["source"], r["id"]): r for r in read_jsonl(wp["sessions_index"])} if wp["sessions_index"].exists() else {}
+    prev = (
+        {(r["source"], r["id"]): r for r in read_jsonl(wp["sessions_index"])} if wp["sessions_index"].exists() else {}
+    )
     cache = {(r["source"], r["id"]): r for r in read_jsonl(unsel_path)} if unsel_path.exists() else {}
     skipped = {}
     cands, guardians = discover_candidates(cfg, skipped=skipped)
@@ -185,8 +209,13 @@ def cmd_extract(cfg, args):
         if key in sel or c["excluded"]:
             continue
         pr = prev.get(key)
-        if not args.force and pr and pr.get("selected_by") == "mention" and fresh(pr, c) \
-                and outputs_exist(pr, ctx["pathhits_dir"], ATLAS_DIR):
+        if (
+            not args.force
+            and pr
+            and pr.get("selected_by") == "mention"
+            and fresh(pr, c)
+            and outputs_exist(pr, ctx["pathhits_dir"], ATLAS_DIR)
+        ):
             sel[key] = "mention"
             continue
         cr = cache.get(key)
@@ -218,8 +247,13 @@ def cmd_extract(cfg, args):
         if not sb or c["key"] in errors:
             continue
         pr = prev.get(c["key"])
-        if c["key"] not in parsed and not args.force and pr and fresh(pr, c) \
-                and outputs_exist(pr, ctx["pathhits_dir"], ATLAS_DIR):
+        if (
+            c["key"] not in parsed
+            and not args.force
+            and pr
+            and fresh(pr, c)
+            and outputs_exist(pr, ctx["pathhits_dir"], ATLAS_DIR)
+        ):
             rec = dict(pr)
             rec["selected_by"] = sb
             reused += 1
@@ -249,15 +283,23 @@ def cmd_extract(cfg, args):
     counts = Counter(c["source"] for c in cands)
     extra = "".join(f", {counts[s]} {s}" for s in SOURCES if s not in ("codex", "claude") and counts[s])
     dups = skipped.get("copilot", 0)
-    print(f"scanned {len(cands) + sum(skipped.values())} sessions ({counts['codex']} codex, {counts['claude']} claude"
-          f"{extra}); guardians skipped {guardians}" + (f"; copilot duplicates dropped {dups}" if dups else ""))
-    print(f"selected {len(rows)}: by cwd {stats['by_cwd']}, by parent {stats['by_parent']}, "
-          f"by mention {stats['by_mention']}")
-    print("per source/kind: " + ", ".join(f"{s} {k} {n}" for (s, k), n in
-                                          sorted((k, v) for k, v in stats.items() if isinstance(k, tuple))))
-    print(f"re-used {reused}, parsed {n_parsed}; unselected: cached {stats['unselected_cached']}, "
-          f"parsed {stats['unselected_parsed']}, skipped by byte prefilter {stats['prefilter_skip']}; "
-          f"errors {len(errors)}")
+    print(
+        f"scanned {len(cands) + sum(skipped.values())} sessions ({counts['codex']} codex, {counts['claude']} claude"
+        f"{extra}); guardians skipped {guardians}" + (f"; copilot duplicates dropped {dups}" if dups else "")
+    )
+    print(
+        f"selected {len(rows)}: by cwd {stats['by_cwd']}, by parent {stats['by_parent']}, "
+        f"by mention {stats['by_mention']}"
+    )
+    print(
+        "per source/kind: "
+        + ", ".join(f"{s} {k} {n}" for (s, k), n in sorted((k, v) for k, v in stats.items() if isinstance(k, tuple)))
+    )
+    print(
+        f"re-used {reused}, parsed {n_parsed}; unselected: cached {stats['unselected_cached']}, "
+        f"parsed {stats['unselected_parsed']}, skipped by byte prefilter {stats['prefilter_skip']}; "
+        f"errors {len(errors)}"
+    )
     raw_mb = sum(r["raw_size"] for r in rows) / 1048576
     cond = [ATLAS_DIR / r["condensed_path"] for r in rows if r["condensed_path"]]
     cond_mb = sum(p.stat().st_size for p in cond) / 1048576

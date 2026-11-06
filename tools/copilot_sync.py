@@ -3,6 +3,7 @@
 Standalone Python 3.9+, stdlib only. Preview is the default; --upload enables SSH/SCP.
 Only workspace folder metadata and chatSessions/*.jsonl are collected.
 """
+
 import argparse
 import ctypes
 import json
@@ -18,7 +19,6 @@ import uuid
 import zipfile
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
-
 
 WORKSPACE_RE = re.compile(r"[0-9a-f]{32}(?:-\d+)?")
 SESSION_RE = re.compile(r"[0-9a-fA-F-]{36}\.jsonl")
@@ -37,8 +37,15 @@ def windows_shared_read(path):
 
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     create = kernel.CreateFileW
-    create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
-                       wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    create.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    ]
     create.restype = wintypes.HANDLE
     close = kernel.CloseHandle
     close.argtypes = [wintypes.HANDLE]
@@ -131,8 +138,9 @@ def upload(archive, host, port, atlas_dir, remote_python):
     ssh = ["ssh", "-T", "-p", str(port), "-o", "ConnectTimeout=10", host]
     subprocess.run(ssh + [shlex.join(["mkdir", "-p", atlas_dir + "/work"])], check=True)
     try:
-        subprocess.run(["scp", "-P", str(port), "-o", "ConnectTimeout=10",
-                        str(archive), host + ":" + remote], check=True)
+        subprocess.run(
+            ["scp", "-P", str(port), "-o", "ConnectTimeout=10", str(archive), host + ":" + remote], check=True
+        )
         command = [remote_python, atlas_dir + "/atlas.py", "import-copilot", remote, "--extract"]
         subprocess.run(ssh + [shlex.join(command)], check=True)
     finally:
@@ -146,10 +154,18 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     appdata = os.environ.get("APPDATA")
     default_storage = Path(appdata) / "Code/User/workspaceStorage" if appdata else None
-    parser.add_argument("--storage", type=Path, default=default_storage,
-                        help="workspaceStorage path; defaults to %%APPDATA%%/Code/User/workspaceStorage")
-    parser.add_argument("--root", action="append", required=True,
-                        help="remote research folder prefix to include; repeat for additional roots")
+    parser.add_argument(
+        "--storage",
+        type=Path,
+        default=default_storage,
+        help="workspaceStorage path; defaults to %%APPDATA%%/Code/User/workspaceStorage",
+    )
+    parser.add_argument(
+        "--root",
+        action="append",
+        required=True,
+        help="remote research folder prefix to include; repeat for additional roots",
+    )
     parser.add_argument("--upload", action="store_true", help="upload and extract; otherwise preview only")
     parser.add_argument("--host", help="SSH alias or user@hostname")
     parser.add_argument("--port", type=int, default=22)

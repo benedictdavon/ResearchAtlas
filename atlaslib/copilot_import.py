@@ -1,4 +1,5 @@
 """Receive a selective PC chat archive into the generated workspace mirror."""
+
 import filecmp
 import json
 import os
@@ -16,7 +17,6 @@ from atlaslib.core import ATLAS_DIR, under
 from atlaslib.extract import cmd_extract
 from atlaslib.sources.copilot import _folder_path
 
-
 ENTRY_RE = re.compile(
     r"([0-9a-f]{32}(?:-\d+)?)/(workspace\.json|chatSessions/"
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.jsonl)"
@@ -31,8 +31,7 @@ def import_archive(archive, destination, project):
         infos = zf.infolist()
         for info in infos:
             match = ENTRY_RE.fullmatch(info.filename)
-            if (not match or info.filename in names
-                    or stat.S_ISLNK(info.external_attr >> 16)):
+            if not match or info.filename in names or stat.S_ISLNK(info.external_attr >> 16):
                 raise ValueError(f"Unexpected, duplicate, or symlink archive entry: {info.filename}")
             names.add(info.filename)
             workspace, relative = match.groups()

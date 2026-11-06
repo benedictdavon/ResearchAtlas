@@ -1,4 +1,5 @@
 """paths: aggregate per-session path hits into paths.jsonl and verify each path (timeout-guarded)."""
+
 import json
 import os
 import select
@@ -6,7 +7,7 @@ import subprocess
 import sys
 import time
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from atlaslib.core import _KIND_BY_EXT, read_jsonl, work_paths, write_jsonl
@@ -17,7 +18,7 @@ VERIFY_FIELDS = ("status", "is_dir", "size", "mtime", "is_symlink", "checked_at"
 # Runs in a child process (python -I -c). Reads one path per stdin line (bytes, filesystem
 # encoding) and answers one JSON line per path. All NFS access happens here, so a hung stat
 # blocks only this helper, which the parent can kill.
-_PROBE_SRC = r'''
+_PROBE_SRC = r"""
 import json, os, stat, sys
 for line in sys.stdin.buffer:
     path = os.fsdecode(line.rstrip(b"\n"))
@@ -38,7 +39,7 @@ for line in sys.stdin.buffer:
         out["is_symlink"] = os.path.islink(path)
     sys.stdout.write(json.dumps(out) + "\n")
     sys.stdout.flush()
-'''
+"""
 
 
 class _PathProbe:
@@ -46,8 +47,8 @@ class _PathProbe:
 
     def __init__(self):
         self.proc = subprocess.Popen(
-            [sys.executable, "-I", "-c", _PROBE_SRC],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd="/")
+            [sys.executable, "-I", "-c", _PROBE_SRC], stdin=subprocess.PIPE, stdout=subprocess.PIPE, cwd="/"
+        )
         self.buf = b""
 
     def check(self, path, timeout_s):
@@ -59,7 +60,7 @@ class _PathProbe:
             self.proc.stdin.write(os.fsencode(path) + b"\n")
             self.proc.stdin.flush()
         except BrokenPipeError:
-            raise EOFError("helper stdin closed")
+            raise EOFError("helper stdin closed") from None
         fd = self.proc.stdout.fileno()
         deadline = time.monotonic() + timeout_s
         while b"\n" not in self.buf:
@@ -94,11 +95,11 @@ class _PathProbe:
 
 
 def _paths_now_iso():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _paths_ts_iso(ts):
-    return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.fromtimestamp(ts, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _path_mount(path):
@@ -142,9 +143,9 @@ def verify_paths(paths, timeout_s):
                 continue
             mount = _path_mount(path)
             if timeouts.get(mount, 0) >= PATH_MOUNT_TIMEOUT_LIMIT:
-                results[path] = _path_result({
-                    "status": "unreachable",
-                    "error": f"skipped: {mount} timed out {PATH_MOUNT_TIMEOUT_LIMIT} times"})
+                results[path] = _path_result(
+                    {"status": "unreachable", "error": f"skipped: {mount} timed out {PATH_MOUNT_TIMEOUT_LIMIT} times"}
+                )
                 continue
             if "\n" in path or "\r" in path:
                 results[path] = _path_result({"status": "unreachable", "error": "path has a newline"})
@@ -182,7 +183,12 @@ def _load_pathhits(pathhits_dir):
         except (OSError, json.JSONDecodeError):
             print(f"warning: unreadable pathhits file {fp}", file=sys.stderr)
             continue
-        if not isinstance(rec, dict) or not isinstance(rec.get("hits"), dict) or "source" not in rec or "short_id" not in rec:
+        if (
+            not isinstance(rec, dict)
+            or not isinstance(rec.get("hits"), dict)
+            or "source" not in rec
+            or "short_id" not in rec
+        ):
             print(f"warning: malformed pathhits file {fp}", file=sys.stderr)
             continue
         sessions.append(rec)
@@ -225,15 +231,17 @@ def _paths_aggregate(sessions, roots, max_ids):
         starts = [a for a, _ in ss.values() if a]
         ends = [b for _, b in ss.values() if b]
         newest_first = sorted(ss, key=lambda k: (ss[k][0] or "", k), reverse=True)
-        rows.append({
-            "path": path,
-            "root": _path_root(path, roots),
-            "first_seen": min(starts) if starts else None,
-            "last_seen": max(ends) if ends else None,
-            "n_sessions": len(ss),
-            "n_mentions": rec["n_mentions"],
-            "session_ids": newest_first[:max_ids],
-        })
+        rows.append(
+            {
+                "path": path,
+                "root": _path_root(path, roots),
+                "first_seen": min(starts) if starts else None,
+                "last_seen": max(ends) if ends else None,
+                "n_sessions": len(ss),
+                "n_mentions": rec["n_mentions"],
+                "session_ids": newest_first[:max_ids],
+            }
+        )
     return rows
 
 
@@ -255,8 +263,9 @@ def _print_paths_summary(rows, n_sessions, verify_s):
     _print_counts("counts by kind", Counter(r["kind"] for r in rows))
     print("top 25 paths by n_sessions:")
     for r in rows[:25]:
-        print(f"  {r['n_sessions']:4d} sess {r['n_mentions']:6d} mentions  "
-              f"{r['status']:11s} {r['kind']:8s} {r['path']}")
+        print(
+            f"  {r['n_sessions']:4d} sess {r['n_mentions']:6d} mentions  {r['status']:11s} {r['kind']:8s} {r['path']}"
+        )
 
 
 def cmd_paths(cfg, args):

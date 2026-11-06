@@ -1,12 +1,30 @@
 """Claude Code transcripts: sessions, subagent files, and condensing (docs/02: Transcript parsing rules)."""
+
 from pathlib import Path
 
-from atlaslib.core import (bullet, cmd_line, collapse_ws, heading, new_state, note_ts, parse_ts, read_json,
-                           scan_obj, scan_paths, truncate, walk_jsonl)
+from atlaslib.core import (
+    bullet,
+    cmd_line,
+    collapse_ws,
+    heading,
+    new_state,
+    note_ts,
+    parse_ts,
+    read_json,
+    scan_obj,
+    scan_paths,
+    truncate,
+    walk_jsonl,
+)
 
 NAME = "claude"
-CLAUDE_DROP_PREFIXES = ("[Image: ", "Base directory for this skill:", "<local-command-caveat>",
-                        "<command-name>", "<local-command-stdout>")
+CLAUDE_DROP_PREFIXES = (
+    "[Image: ",
+    "Base directory for this skill:",
+    "<local-command-caveat>",
+    "<command-name>",
+    "<local-command-stdout>",
+)
 
 
 def claude_flush(st, buf, cwd_default, lim):
@@ -17,8 +35,13 @@ def claude_flush(st, buf, cwd_default, lim):
         btype = b.get("type")
         if btype == "text":
             final = stop == "end_turn"
-            heading(st, "AGENT (final)" if final else "AGENT", ts, b.get("text") or "",
-                    lim["agent_final"] if final else lim["agent_commentary"])
+            heading(
+                st,
+                "AGENT (final)" if final else "AGENT",
+                ts,
+                b.get("text") or "",
+                lim["agent_final"] if final else lim["agent_commentary"],
+            )
         elif btype == "tool_use":
             claude_tool_bullets(st, ts, b.get("name") or "", b.get("input") or {}, cwd or cwd_default, lim)
 
@@ -139,14 +162,34 @@ def discover(cfg, paths=None):
     if root.is_dir():
         for proj in sorted(p for p in root.iterdir() if p.is_dir()):
             for f in sorted(proj.glob("*.jsonl")):
-                cands.append({"source": NAME, "kind": "root", "id": f.stem, "short": f.stem[:8],
-                              "path": f, "parent_id": None, "cwd": claude_first_cwd(f), "meta": {}})
+                cands.append(
+                    {
+                        "source": NAME,
+                        "kind": "root",
+                        "id": f.stem,
+                        "short": f.stem[:8],
+                        "path": f,
+                        "parent_id": None,
+                        "cwd": claude_first_cwd(f),
+                        "meta": {},
+                    }
+                )
             for f in sorted(proj.glob("*/subagents/agent-*.jsonl")):
-                aid = f.name[len("agent-"):-len(".jsonl")]
+                aid = f.name[len("agent-") : -len(".jsonl")]
                 meta = read_json(f.with_name(f"agent-{aid}.meta.json"))
                 parent = meta.get("parentAgentId") or f.parent.parent.name
-                cands.append({"source": NAME, "kind": "subagent", "id": aid, "short": aid[:8],
-                              "path": f, "parent_id": parent, "cwd": claude_first_cwd(f), "meta": meta})
+                cands.append(
+                    {
+                        "source": NAME,
+                        "kind": "subagent",
+                        "id": aid,
+                        "short": aid[:8],
+                        "path": f,
+                        "parent_id": parent,
+                        "cwd": claude_first_cwd(f),
+                        "meta": meta,
+                    }
+                )
     return cands, 0
 
 

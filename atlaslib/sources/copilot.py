@@ -13,17 +13,30 @@ Stdlib only. A subagent's own activity is never rendered as main-agent text: its
 report is the subagent's result (A: toolCallResults; B: the task result, or the subagent's final message at
 subagent.completed).
 """
+
 import json
 import os
 import re
 import sys
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-from atlaslib.core import (bullet, cmd_line, collapse_ws, heading, new_state, note_ts, parse_ts,
-                           read_json, scan_obj, scan_paths, truncate, walk_jsonl)
+from atlaslib.core import (
+    bullet,
+    cmd_line,
+    collapse_ws,
+    heading,
+    new_state,
+    note_ts,
+    parse_ts,
+    read_json,
+    scan_obj,
+    scan_paths,
+    truncate,
+    walk_jsonl,
+)
 
 NAME = "copilot"
 FS_TIMEOUT_S = 10  # hard NFS mounts can hang; every discovery-time filesystem call is guarded
@@ -31,23 +44,51 @@ KIND_RANK = {"chat": 0, "agent": 1, "transcript": 2}  # duplicate ids: chat (A) 
 
 # Tool names -> one canonical tool. Chat (A) uses VS Code toolIds (copilot_*); agent/transcript (B/C) use CLI names.
 CANON = {
-    "copilot_readFile": "read_file", "read_file": "read_file", "view": "read_file",
-    "copilot_listDirectory": "list_dir", "list_dir": "list_dir",
-    "copilot_findTextInFiles": "grep", "grep_search": "grep", "grep": "grep", "rg": "grep",
-    "copilot_findFiles": "find", "file_search": "find", "glob": "find",
-    "copilot_editNotebook": "edit", "edit_notebook_file": "edit", "copilot_replaceString": "edit",
-    "replace_string_in_file": "edit", "edit": "edit",
-    "copilot_multiReplaceString": "multi_edit", "multi_replace_string_in_file": "multi_edit",
-    "copilot_applyPatch": "apply_patch", "apply_patch": "apply_patch",
-    "copilot_createFile": "create", "create_file": "create", "create": "create",
-    "run_in_terminal": "terminal", "bash": "terminal",
-    "runSubagent": "agent", "execution_subagent": "agent", "search_subagent": "agent", "task": "agent",
+    "copilot_readFile": "read_file",
+    "read_file": "read_file",
+    "view": "read_file",
+    "copilot_listDirectory": "list_dir",
+    "list_dir": "list_dir",
+    "copilot_findTextInFiles": "grep",
+    "grep_search": "grep",
+    "grep": "grep",
+    "rg": "grep",
+    "copilot_findFiles": "find",
+    "file_search": "find",
+    "glob": "find",
+    "copilot_editNotebook": "edit",
+    "edit_notebook_file": "edit",
+    "copilot_replaceString": "edit",
+    "replace_string_in_file": "edit",
+    "edit": "edit",
+    "copilot_multiReplaceString": "multi_edit",
+    "multi_replace_string_in_file": "multi_edit",
+    "copilot_applyPatch": "apply_patch",
+    "apply_patch": "apply_patch",
+    "copilot_createFile": "create",
+    "create_file": "create",
+    "create": "create",
+    "run_in_terminal": "terminal",
+    "bash": "terminal",
+    "runSubagent": "agent",
+    "execution_subagent": "agent",
+    "search_subagent": "agent",
+    "task": "agent",
     "ask_user": "ask",
 }
 # No bullet: bookkeeping, polling and memory tools (docs/02: noise). read_agent only polls a subagent; its report
 # comes from the subagent's completion (see event_record).
-SILENT_TOOLS = {"manage_todo_list", "tool_search", "task_complete", "get_terminal_output", "kill_terminal",
-                "read_bash", "read_agent", "copilot_memory", "memory"}
+SILENT_TOOLS = {
+    "manage_todo_list",
+    "tool_search",
+    "task_complete",
+    "get_terminal_output",
+    "kill_terminal",
+    "read_bash",
+    "read_agent",
+    "copilot_memory",
+    "memory",
+}
 # Subagent results that only say the agent was started. The report comes later, from subagent.completed (B).
 BOILERPLATE_PREFIXES = ("Agent started in background",)
 PATCH_FILE_RE = re.compile(r'\*\*\* (Add|Update|Delete) File: ([^\s"\'`\\]+)')
@@ -56,6 +97,7 @@ PATCH_FILE_RE = re.compile(r'\*\*\* (Add|Update|Delete) File: ([^\s"\'`\\]+)')
 # ---------------------------------------------------------------------------
 # discovery
 # ---------------------------------------------------------------------------
+
 
 def _guarded(fn, *args):
     """Run one filesystem call in a daemon thread with FS_TIMEOUT_S. None on timeout or error."""
@@ -131,7 +173,7 @@ def _yaml_value(path, key):
     text = _guarded(_read_text, path)
     for line in (text or "").splitlines():
         if line.startswith(key + ":"):
-            v = line[len(key) + 1:].strip()
+            v = line[len(key) + 1 :].strip()
             if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
                 v = v[1:-1]
             return v or None
@@ -139,9 +181,19 @@ def _yaml_value(path, key):
 
 
 def _cand(kind, path, cid, cwd, meta, st):
-    return {"source": "copilot", "kind": kind, "id": cid, "short": cid[:8], "path": path,
-            "parent_id": None, "cwd": cwd, "meta": meta, "size": st.st_size, "mtime": st.st_mtime,
-            "key": ("copilot", cid)}
+    return {
+        "source": "copilot",
+        "kind": kind,
+        "id": cid,
+        "short": cid[:8],
+        "path": path,
+        "parent_id": None,
+        "cwd": cwd,
+        "meta": meta,
+        "size": st.st_size,
+        "mtime": st.st_mtime,
+        "key": ("copilot", cid),
+    }
 
 
 def _chat_cands(entry):
@@ -228,8 +280,9 @@ def discover(cfg, paths=None):
     cands += _transcript_cands(scfg.get("vscode_storage"), scfg.get("workspace_cwd"))
 
     best, skipped = {}, 0
-    for c in sorted(cands, key=lambda c: (KIND_RANK[c["kind"]], not c.get("synced", False),
-                                        -c["size"], str(c["path"]))):
+    for c in sorted(
+        cands, key=lambda c: (KIND_RANK[c["kind"]], not c.get("synced", False), -c["size"], str(c["path"]))
+    ):
         if c["id"] in best:
             skipped += 1
         else:
@@ -243,8 +296,9 @@ def discover(cfg, paths=None):
             c["short"] = c["id"][:13]
     for short, ids in sorted(ids8.items()):
         if len(ids) > 1:
-            print(f"warning: copilot: ids share prefix {short}: {', '.join(sorted(ids))}; using 13 chars",
-                  file=sys.stderr)
+            print(
+                f"warning: copilot: ids share prefix {short}: {', '.join(sorted(ids))}; using 13 chars", file=sys.stderr
+            )
     return kept, skipped
 
 
@@ -256,6 +310,7 @@ def prepare(cfg, ctx):
 # ---------------------------------------------------------------------------
 # chat (kind "chat"): replay of the VS Code op log
 # ---------------------------------------------------------------------------
+
 
 def _child(cur, key, make):
     """cur[key] as a container, created with make() where the slot is missing. None if cur cannot hold key."""
@@ -277,7 +332,7 @@ def _child(cur, key, make):
 def _parent(root, path):
     """Container holding path[-1], creating missing intermediate levels. None if unreachable."""
     cur = root
-    for key, nxt in zip(path[:-1], path[1:]):
+    for key, nxt in zip(path[:-1], path[1:], strict=True):
         cur = _child(cur, key, list if isinstance(nxt, int) else dict)
         if cur is None:
             return None
@@ -364,7 +419,7 @@ def _ms_ts(ms):
     if isinstance(ms, bool) or not isinstance(ms, (int, float)):
         return None
     try:
-        return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
+        return datetime.fromtimestamp(ms / 1000, tz=UTC)
     except (OverflowError, OSError, ValueError):
         return None
 
@@ -464,8 +519,13 @@ def _emit_turn(st, events, lim):
     for i, (kind, ts, val) in enumerate(events):
         if kind == "text":
             final = i == last
-            heading(st, "AGENT (final)" if final else "AGENT", ts, val,
-                    lim["agent_final"] if final else lim["agent_commentary"])
+            heading(
+                st,
+                "AGENT (final)" if final else "AGENT",
+                ts,
+                val,
+                lim["agent_final"] if final else lim["agent_commentary"],
+            )
         elif kind == "bullet":
             bullet(st, ts, val)
         elif kind == "report":
@@ -535,10 +595,11 @@ def part_uri_paths(part):
 
 
 def inline_text(part):
-    """Text of an inlineReference part: a code symbol's name (as the Chat panel shows it), else the file path, else name.
+    """Text of an inlineReference part: a code symbol's name (as the Chat panel shows it), else its file path or name.
 
     A symbol reference ({name, kind, location}) must not become its location path: that path is often a library file
-    (e.g. json.load -> /usr/lib/python3.8/json/__init__.py) and would corrupt the prose. Its path is harvested separately.
+    (e.g. json.load -> /usr/lib/python3.8/json/__init__.py) and would corrupt the prose. Its path is harvested
+    separately.
     """
     ref = part.get("inlineReference")
     if not isinstance(ref, dict):
@@ -688,6 +749,7 @@ def chat_condense(path, rx, rx_proj, lim, body_path):
 # events (kinds "agent" and "transcript"): Copilot agent event log
 # ---------------------------------------------------------------------------
 
+
 def _flush_turn(st, lim):
     events, st["turn"] = st["turn"], []
     _emit_turn(st, events, lim)
@@ -779,6 +841,7 @@ def events_condense(path, rx, rx_proj, lim, body_path):
 # ---------------------------------------------------------------------------
 # registry entry points
 # ---------------------------------------------------------------------------
+
 
 def condense(c, ctx, body_path):
     """Condense one Copilot candidate into body_path. Returns the parse state (new_state dict)."""

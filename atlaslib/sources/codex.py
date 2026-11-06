@@ -1,16 +1,35 @@
 """Codex rollouts: discovery, classification, and condensing (docs/02: Codex rollout record format)."""
+
 import hashlib
 import json
 import os
 import re
 from pathlib import Path
 
-from atlaslib.core import (bullet, cmd_line, collapse_ws, heading, new_state, note_ts, parse_ts, read_jsonl,
-                           scan_obj, scan_paths, truncate, walk_jsonl)
+from atlaslib.core import (
+    bullet,
+    cmd_line,
+    collapse_ws,
+    heading,
+    new_state,
+    note_ts,
+    parse_ts,
+    read_jsonl,
+    scan_obj,
+    scan_paths,
+    truncate,
+    walk_jsonl,
+)
 
 NAME = "codex"
-INJECTED_CODEX = ("# AGENTS.md instructions", "<environment_context>", "<turn_aborted>",
-                  "<recommended_plugins>", "<image", "</image>")
+INJECTED_CODEX = (
+    "# AGENTS.md instructions",
+    "<environment_context>",
+    "<turn_aborted>",
+    "<recommended_plugins>",
+    "<image",
+    "</image>",
+)
 CODEX_DROP_CALLS = {"wait", "wait_agent", "sleep", "list_agents", "close_agent", "write_stdin"}
 CODEX_MESSAGE_CALLS = {"spawn_agent", "send_message", "followup_task"}
 
@@ -31,7 +50,7 @@ def discover_codex(cfg):
     """Return (rollout paths, id -> path map). File id is the last 36 chars before .jsonl."""
     root = Path(cfg["sources"]["codex_sessions"])
     paths = sorted(p for p in root.rglob("rollout-*.jsonl") if p.is_file())
-    by_id = {p.name[:-len(".jsonl")][-36:]: p for p in paths}
+    by_id = {p.name[: -len(".jsonl")][-36:]: p for p in paths}
     return paths, by_id
 
 
@@ -188,13 +207,20 @@ def codex_message(st, ts, pl, lim):
             return
         final = pl.get("phase") == "final_answer"
         st["agent_texts"].append(text)
-        heading(st, "AGENT (final)" if final else "AGENT", ts, text,
-                lim["agent_final"] if final else lim["agent_commentary"])
+        heading(
+            st,
+            "AGENT (final)" if final else "AGENT",
+            ts,
+            text,
+            lim["agent_final"] if final else lim["agent_commentary"],
+        )
 
 
 def codex_interagent(st, ts, pl, lim):
     """Plaintext FINAL_ANSWER bodies of inter-agent messages (encrypted ones are dropped)."""
-    texts = [c.get("text", "") for c in pl.get("content") or [] if isinstance(c, dict) and c.get("type") == "input_text"]
+    texts = [
+        c.get("text", "") for c in pl.get("content") or [] if isinstance(c, dict) and c.get("type") == "input_text"
+    ]
     header = "\n".join(texts)
     if "Message Type: FINAL_ANSWER" not in header:
         return
@@ -253,8 +279,7 @@ def codex_record(st, typ, pl, ts, lim):
 def codex_condense(path, kind, parent_path, first_meta, rx, rx_proj, lim, body_path):
     """Stream one Codex rollout into body_path. Returns the parse state (hits, dates, counts)."""
     st = new_state(rx, rx_proj, body_path, lim)
-    st.update(cwd=first_meta.get("cwd"), cli=first_meta.get("cli_version"),
-              spawned=kind == "subagent", task_done=False)
+    st.update(cwd=first_meta.get("cwd"), cli=first_meta.get("cli_version"), spawned=kind == "subagent", task_done=False)
     start_ord = first_meta.get("subagent_history_start_ordinal") if kind == "fork" else None
     parent_hashes = None
     if kind == "fork" and start_ord is None:
@@ -290,10 +315,19 @@ def discover(cfg, paths=None):
         if kind == "guardian":
             guardians += 1
             continue
-        cid = meta.get("id") or p.name[:-len(".jsonl")][-36:]
-        cands.append({"source": NAME, "kind": kind, "id": cid, "short": cid[:13], "path": p,
-                      "parent_id": meta.get("parent_thread_id") or meta.get("forked_from_id"),
-                      "cwd": meta.get("cwd"), "meta": meta})
+        cid = meta.get("id") or p.name[: -len(".jsonl")][-36:]
+        cands.append(
+            {
+                "source": NAME,
+                "kind": kind,
+                "id": cid,
+                "short": cid[:13],
+                "path": p,
+                "parent_id": meta.get("parent_thread_id") or meta.get("forked_from_id"),
+                "cwd": meta.get("cwd"),
+                "meta": meta,
+            }
+        )
     return cands, guardians
 
 
@@ -307,8 +341,7 @@ def prepare(cfg, ctx):
 def condense(c, ctx, body_path):
     """Parse one rollout into body_path; a fork's parent (found by id) is used for the dedupe."""
     parent = ctx["codex_by_id"].get(c["parent_id"]) if c["kind"] == "fork" else None
-    return codex_condense(c["path"], c["kind"], parent, c["meta"], ctx["rx"], ctx["rx_proj"], ctx["lim"],
-                          body_path)
+    return codex_condense(c["path"], c["kind"], parent, c["meta"], ctx["rx"], ctx["rx_proj"], ctx["lim"], body_path)
 
 
 def title(c, st, ctx):

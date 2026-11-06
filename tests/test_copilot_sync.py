@@ -1,4 +1,5 @@
 """Synthetic tests for the standalone PC uploader and server archive receiver."""
+
 import contextlib
 import io
 import json
@@ -19,19 +20,31 @@ from atlaslib import copilot_import
 from atlaslib.sources import copilot
 from tools import copilot_sync as sync
 
-
 ROOT = "/home/user/research"
 CWD = ROOT + "/demo_project"
 HASH = "a" * 32
 SID = "12345678-1111-2222-3333-444444444444"
 URI = "vscode-remote://ssh-remote%2Bjupyter" + CWD
-CHAT = (json.dumps({"kind": 0, "v": {
-    "sessionId": SID, "creationDate": 1780000000000,
-    "requests": [{"message": {"text": "synthetic prompt"}, "timestamp": 1780000000000,
-                  "response": [{"value": "Synthetic answer"}]}],
-}}) + "\n").encode()
-PROJECT = {"roots": [CWD], "cwd_also": [ROOT],
-           "exclude_cwd": ["/home/user/ResearchAtlas"]}
+CHAT = (
+    json.dumps(
+        {
+            "kind": 0,
+            "v": {
+                "sessionId": SID,
+                "creationDate": 1780000000000,
+                "requests": [
+                    {
+                        "message": {"text": "synthetic prompt"},
+                        "timestamp": 1780000000000,
+                        "response": [{"value": "Synthetic answer"}],
+                    }
+                ],
+            },
+        }
+    )
+    + "\n"
+).encode()
+PROJECT = {"roots": [CWD], "cwd_also": [ROOT], "exclude_cwd": ["/home/user/ResearchAtlas"]}
 
 
 class SyncTests(unittest.TestCase):
@@ -82,8 +95,9 @@ class SyncTests(unittest.TestCase):
         (edits / "huge-snapshot").write_bytes(b"not needed")
         self.bundle()
         with zipfile.ZipFile(self.archive) as zf:
-            self.assertEqual(sorted(zf.namelist()),
-                             [HASH + "/chatSessions/" + SID + ".jsonl", HASH + "/workspace.json"])
+            self.assertEqual(
+                sorted(zf.namelist()), [HASH + "/chatSessions/" + SID + ".jsonl", HASH + "/workspace.json"]
+            )
             self.assertEqual(zf.read(HASH + "/chatSessions/" + SID + ".jsonl"), CHAT)
         self.assertFalse((self.tmp / "snapshot.jsonl").exists())
 
@@ -128,9 +142,11 @@ class SyncTests(unittest.TestCase):
         kernel = mock.Mock()
         kernel.CreateFileW.return_value = 99
         msvcrt = SimpleNamespace(open_osfhandle=mock.Mock(return_value=fd))
-        with mock.patch.dict(sys.modules, {"msvcrt": msvcrt}), \
-                mock.patch.object(sync.os, "O_BINARY", 0x8000, create=True), \
-                mock.patch.object(sync.ctypes, "WinDLL", return_value=kernel, create=True):
+        with (
+            mock.patch.dict(sys.modules, {"msvcrt": msvcrt}),
+            mock.patch.object(sync.os, "O_BINARY", 0x8000, create=True),
+            mock.patch.object(sync.ctypes, "WinDLL", return_value=kernel, create=True),
+        ):
             with sync.windows_shared_read(source) as stream:
                 self.assertEqual(stream.read(), CHAT)
         args = kernel.CreateFileW.call_args.args
@@ -143,9 +159,11 @@ class SyncTests(unittest.TestCase):
         kernel = mock.Mock()
         kernel.CreateFileW.return_value = 99
         msvcrt = SimpleNamespace(open_osfhandle=mock.Mock(side_effect=OSError("fd failed")))
-        with mock.patch.dict(sys.modules, {"msvcrt": msvcrt}), \
-                mock.patch.object(sync.os, "O_BINARY", 0x8000, create=True), \
-                mock.patch.object(sync.ctypes, "WinDLL", return_value=kernel, create=True):
+        with (
+            mock.patch.dict(sys.modules, {"msvcrt": msvcrt}),
+            mock.patch.object(sync.os, "O_BINARY", 0x8000, create=True),
+            mock.patch.object(sync.ctypes, "WinDLL", return_value=kernel, create=True),
+        ):
             with self.assertRaisesRegex(OSError, "fd failed"):
                 sync.windows_shared_read("locked.jsonl")
         kernel.CloseHandle.assert_called_once_with(99)
@@ -190,8 +208,7 @@ class SyncTests(unittest.TestCase):
         self.assertEqual((self.destination / HASH / "chatSessions" / (SID + ".jsonl")).read_bytes(), updated)
 
     def test_path_traversal_is_rejected_before_any_mirror_write(self):
-        self.raw_archive([(HASH + "/workspace.json", json.dumps({"folder": URI})),
-                          ("../../outside", "bad")])
+        self.raw_archive([(HASH + "/workspace.json", json.dumps({"folder": URI})), ("../../outside", "bad")])
         with self.assertRaisesRegex(ValueError, "Unexpected"):
             self.import_bundle()
         self.assertFalse(self.destination.exists())
@@ -235,8 +252,12 @@ class SyncTests(unittest.TestCase):
             self.import_bundle()
 
     def test_unrelated_workspace_is_rejected(self):
-        self.raw_archive([(HASH + "/workspace.json", json.dumps({"folder": "file:///private/project"})),
-                          (HASH + "/chatSessions/" + SID + ".jsonl", CHAT)])
+        self.raw_archive(
+            [
+                (HASH + "/workspace.json", json.dumps({"folder": "file:///private/project"})),
+                (HASH + "/chatSessions/" + SID + ".jsonl", CHAT),
+            ]
+        )
         with self.assertRaisesRegex(ValueError, "outside"):
             self.import_bundle()
 
@@ -251,8 +272,12 @@ class SyncTests(unittest.TestCase):
         self.workspace()
         self.bundle()
         self.import_bundle()
-        self.raw_archive([(HASH + "/workspace.json", json.dumps({"folder": URI})),
-                          (HASH + "/chatSessions/" + SID + ".jsonl", b"synthetic prompt")])
+        self.raw_archive(
+            [
+                (HASH + "/workspace.json", json.dumps({"folder": URI})),
+                (HASH + "/chatSessions/" + SID + ".jsonl", b"synthetic prompt"),
+            ]
+        )
         data = self.archive.read_bytes().replace(b"synthetic prompt", b"corrupted prompt")
         self.archive.write_bytes(data)
         with self.assertRaises(zipfile.BadZipFile):
@@ -260,8 +285,10 @@ class SyncTests(unittest.TestCase):
         self.assertEqual((self.destination / HASH / "chatSessions" / (SID + ".jsonl")).read_bytes(), CHAT)
 
     def test_transport_uses_port_2222_and_runs_import_then_cleanup(self):
-        with mock.patch.object(sync.shutil, "which", return_value="/mock"), \
-                mock.patch.object(sync.subprocess, "run") as run:
+        with (
+            mock.patch.object(sync.shutil, "which", return_value="/mock"),
+            mock.patch.object(sync.subprocess, "run") as run,
+        ):
             sync.upload(self.archive, "user@192.0.2.10", 2222, "/atlas", "/opt/conda/bin/python")
         calls = [call.args[0] for call in run.call_args_list]
         self.assertEqual(calls[0][:5], ["ssh", "-T", "-p", "2222", "-o"])
@@ -274,8 +301,10 @@ class SyncTests(unittest.TestCase):
 
     def test_failed_upload_does_not_run_extraction_and_cleans_partial_archive(self):
         failure = subprocess.CalledProcessError(1, ["scp"])
-        with mock.patch.object(sync.shutil, "which", return_value="/mock"), \
-                mock.patch.object(sync.subprocess, "run", side_effect=[None, failure, None]) as run:
+        with (
+            mock.patch.object(sync.shutil, "which", return_value="/mock"),
+            mock.patch.object(sync.subprocess, "run", side_effect=[None, failure, None]) as run,
+        ):
             with self.assertRaises(subprocess.CalledProcessError):
                 sync.upload(self.archive, "user@host", 2222, "/atlas", "/python")
         self.assertEqual(run.call_count, 3)
@@ -291,8 +320,19 @@ class SyncTests(unittest.TestCase):
         self.workspace()
         with mock.patch.object(sync, "upload", side_effect=RuntimeError("transfer failed")):
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
-                result = sync.main(["--storage", str(self.storage), "--root", ROOT,
-                                    "--upload", "--host", "user@host", "--atlas-dir", "/atlas"])
+                result = sync.main(
+                    [
+                        "--storage",
+                        str(self.storage),
+                        "--root",
+                        ROOT,
+                        "--upload",
+                        "--host",
+                        "user@host",
+                        "--atlas-dir",
+                        "/atlas",
+                    ]
+                )
         self.assertEqual(result, 1)
         self.assertIn("transfer failed", err.getvalue())
 
@@ -301,20 +341,31 @@ class SyncTests(unittest.TestCase):
         self.bundle()
         expected = self.tmp / "work/copilot_import/workspaceStorage"
         cfg = {
-            "sources": {"copilot": {"chat_storage": str(expected)},
-                        "codex_sessions": str(self.tmp / "absent-codex"),
-                        "codex_session_index": str(self.tmp / "absent-index"),
-                        "claude_projects": str(self.tmp / "absent-claude")},
-            "project": dict(PROJECT, name="synthetic", work_dir=self.tmp / "work/synthetic",
-                            knowledge_dir=self.tmp / "knowledge", exclude_ids=[]),
+            "sources": {
+                "copilot": {"chat_storage": str(expected)},
+                "codex_sessions": str(self.tmp / "absent-codex"),
+                "codex_session_index": str(self.tmp / "absent-index"),
+                "claude_projects": str(self.tmp / "absent-claude"),
+            },
+            "project": dict(
+                PROJECT,
+                name="synthetic",
+                work_dir=self.tmp / "work/synthetic",
+                knowledge_dir=self.tmp / "knowledge",
+                exclude_ids=[],
+            ),
             "paths": {"roots": [ROOT]},
-            "limits": {"user_text": 8000, "agent_final": 40000, "agent_commentary": 2000,
-                       "tool_input": 400, "subagent_result": 3000},
+            "limits": {
+                "user_text": 8000,
+                "agent_final": 40000,
+                "agent_commentary": 2000,
+                "tool_input": 400,
+                "subagent_result": 3000,
+            },
         }
         with mock.patch.object(copilot_import, "ATLAS_DIR", self.tmp):
             with contextlib.redirect_stdout(io.StringIO()):
-                code = copilot_import.cmd_import_copilot(
-                    cfg, SimpleNamespace(archive=self.archive, extract=True))
+                code = copilot_import.cmd_import_copilot(cfg, SimpleNamespace(archive=self.archive, extract=True))
         self.assertEqual(code, 0)
         work = cfg["project"]["work_dir"]
         row = json.loads((work / "sessions.jsonl").read_text())

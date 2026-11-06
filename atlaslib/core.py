@@ -1,9 +1,10 @@
 """Shared helpers: config, JSONL I/O, path harvesting regexes, and the condensed-writer state."""
+
 import json
 import os
 import re
 import tomllib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 ATLAS_DIR = Path(__file__).resolve().parent.parent
@@ -17,8 +18,11 @@ def load_config(path=None):
     proj["work_dir"] = ATLAS_DIR / proj["work_dir"]
     proj["knowledge_dir"] = ATLAS_DIR / proj["knowledge_dir"]
     # Review ledger (D25): committed next to knowledge/, unless configured elsewhere.
-    proj["review_ledger"] = ATLAS_DIR / proj["review_ledger"] if proj.get("review_ledger") \
+    proj["review_ledger"] = (
+        ATLAS_DIR / proj["review_ledger"]
+        if proj.get("review_ledger")
         else proj["knowledge_dir"].parent / "reviewed_sessions.jsonl"
+    )
     return cfg
 
 
@@ -88,7 +92,7 @@ def parse_ts(s):
     if not isinstance(s, str) or len(s) < 19:
         return None
     try:
-        return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+        return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=UTC)
     except ValueError:
         return None
 
@@ -116,15 +120,18 @@ def truncate(text, limit):
 
 # Path body stops at whitespace, quotes, backticks, <>|,;{}[]*?$ (docs/02 D17), plus ':' and '\'
 # (grep "file:line:" suffixes and JSON/JS escapes otherwise glue onto the path).
-PATH_STOP = '\\s"\'`<>|,;:{}\\[\\]*?$\\\\'
+PATH_STOP = "\\s\"'`<>|,;:{}\\[\\]*?$\\\\"
 # Parentheses are not stops: names like "1x1(iw612)" and "tier1a_feat_PCA_(10D).png" occur. A "(...)" group is
 # taken whole (PATH_GROUP), so a ")" with no "(" inside the path (prose, "func(path, x)") still ends it.
 PATH_GROUP = r"\([^" + PATH_STOP + r"()]*\)"
 # Recording folders are named "YYYY-MM-DD HH:MM:SS" (e.g. exports/.../files/2026-08-13 05:37:04),
-# or "YYYY-MM-DD HH_MM_SS", so a " HH:MM:SS" / " HH_MM_SS" right after a date stays part of the path despite the space and colons.
+# or "YYYY-MM-DD HH_MM_SS", so a " HH:MM:SS" / " HH_MM_SS" right after a date stays part of the path despite the
+# space and colons.
 # A path may also start right after a literal backslash + n/t/r (doubly escaped tool output: "notice.xlsx\n/mnt/...").
-PATH_RE_TMPL = (r"(?:(?<=file://)|(?<![\w./-])|(?<=\\[ntr]))(?:{root})(?=/|[^\w.\-]|$)"
-                r"(?:[^" + PATH_STOP + r"()]|" + PATH_GROUP + r"|(?<=\d-\d\d) \d\d[:_]\d\d[:_]\d\d)*")
+PATH_RE_TMPL = (
+    r"(?:(?<=file://)|(?<![\w./-])|(?<=\\[ntr]))(?:{root})(?=/|[^\w.\-]|$)"
+    r"(?:[^" + PATH_STOP + r"()]|" + PATH_GROUP + r"|(?<=\d-\d\d) \d\d[:_]\d\d[:_]\d\d)*"
+)
 # Kind guess by extension (docs/04_mvp_spec.md §2). Anything else: "dir" if verified as a
 # directory, else "other".
 PATH_KINDS = [
@@ -146,7 +153,8 @@ def path_regex(roots):
 
 
 # grep -n context lines glue "-<line>-<text>" onto a file name, e.g. ".../loader.py-52-#". The part before the
-# suffix is cut only if it ends in a known extension (_KIND_BY_EXT), so ".../test_d4f.cpython-310-pytest-9.1.1.pyc" stays whole.
+# suffix is cut only if it ends in a known extension (_KIND_BY_EXT), so
+# ".../test_d4f.cpython-310-pytest-9.1.1.pyc" stays whole.
 GREP_CONTEXT_RE = re.compile(r"^(.*?\.[A-Za-z0-9]{1,8})-\d+-.*$")
 
 
@@ -154,7 +162,7 @@ def clean_path(raw):
     """Strip trailing punctuation, normalize; None if empty or over 400 chars."""
     p = raw
     m = GREP_CONTEXT_RE.match(raw)
-    if m and m.group(1)[m.group(1).rfind("."):].lower() in _KIND_BY_EXT:
+    if m and m.group(1)[m.group(1).rfind(".") :].lower() in _KIND_BY_EXT:
         p = m.group(1)
     p = p.rstrip(".:'/")
     if not p or len(p) > 400:
@@ -192,10 +200,26 @@ def under(path, prefixes):
 
 def new_state(rx, rx_proj, body_path, lim):
     """Per-session parse state: streams condensed body to body_path, collects hits and flags."""
-    return {"rx": rx, "rx_proj": rx_proj, "lim": lim, "fh": open(body_path, "w", encoding="utf-8"),
-            "hits": {}, "n_text": 0, "n_user": 0, "wrote": False, "open_agent": False,
-            "first_user": None, "start": None, "end": None, "last_ts": None,
-            "agent_texts": [], "mention": False, "title": None, "cli": None, "cwd": None}
+    return {
+        "rx": rx,
+        "rx_proj": rx_proj,
+        "lim": lim,
+        "fh": open(body_path, "w", encoding="utf-8"),
+        "hits": {},
+        "n_text": 0,
+        "n_user": 0,
+        "wrote": False,
+        "open_agent": False,
+        "first_user": None,
+        "start": None,
+        "end": None,
+        "last_ts": None,
+        "agent_texts": [],
+        "mention": False,
+        "title": None,
+        "cli": None,
+        "cwd": None,
+    }
 
 
 def note_ts(st, ts):

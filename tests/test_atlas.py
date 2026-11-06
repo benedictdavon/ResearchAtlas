@@ -9,6 +9,7 @@ Only synthetic transcripts in temporary directories are used. Nothing under ~/.c
 
 Run: cd /home/user/ResearchAtlas && /opt/conda/bin/python -m unittest discover -s tests -v
 """
+
 import contextlib
 import io
 import json
@@ -20,7 +21,13 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import atlas  # noqa: E402
+from atlaslib.cli import main  # noqa: E402
+from atlaslib.core import clean_path, load_config, parse_ts, path_regex, scan_paths, under, work_paths  # noqa: E402
+from atlaslib.extract import discover_candidates, select_candidates  # noqa: E402
+from atlaslib.refresh import atlas_feedback, cited_paths, expand_cited  # noqa: E402
+from atlaslib.review import condensed_digest, load_ledger, parse_report, pending_sessions, session_key  # noqa: E402
+from atlaslib.sources.claude import claude_condense  # noqa: E402
+from atlaslib.sources.codex import codex_class, codex_condense, codex_user_part  # noqa: E402
 
 TS = "2026-10-10T10:00:00.000Z"
 TS2 = "2026-10-10T10:05:00.000Z"
@@ -30,19 +37,20 @@ ROOT_MB = RESEARCH + "/model_bank"
 ATLAS_CWD = "/home/user/ResearchAtlas"
 OTHER_CWD = "/home/user/other_project"
 PATH_ROOTS = ["/mnt/data", "/mnt/nas_data", "/mnt/tmp", "/mnt/shared", RESEARCH]
-NAS_RECORDING = ("/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940/files/"
-                 "2026-10-10 17:45:04/002/00/1/2/data_0.npy")
-NAS_RECORDING_HHMMSS = ("/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940/files/"
-                        "2026-10-10 17_45_04/002/00/1/2/data_0.npy")
+NAS_RECORDING = (
+    "/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940/files/2026-10-10 17:45:04/002/00/1/2/data_0.npy"
+)
+NAS_RECORDING_HHMMSS = (
+    "/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940/files/2026-10-10 17_45_04/002/00/1/2/data_0.npy"
+)
 
 # Same values as the [limits] table written by make_config(); used for direct calls.
-LIMITS = {"user_text": 8000, "agent_final": 40000, "agent_commentary": 2000,
-          "tool_input": 400, "subagent_result": 3000}
+LIMITS = {"user_text": 8000, "agent_final": 40000, "agent_commentary": 2000, "tool_input": 400, "subagent_result": 3000}
 
 # Codex ids: 36-char UUIDs. The first 13 chars are the citation id (D15).
 CX_ROOT = "01a1619b-8270-7000-8000-000000000001"
 CX_CHILD = "01a1619b-c103-7000-8000-000000000002"  # shares the 8-char prefix, not the 13-char one
-CX_EXCLUDED = "01a1700a-530c-7000-8000-000000000003"        # id prefix that config.toml excludes (D20)
+CX_EXCLUDED = "01a1700a-530c-7000-8000-000000000003"  # id prefix that config.toml excludes (D20)
 
 HEADING_RE = re.compile(r"^### (?:\d{4}-\d\d-\d\d \d\d:\d\d|----) (.+)$", re.M)
 
@@ -60,9 +68,8 @@ def dump_jsonl(path, records):
             fh.write("\n")
 
 
-def make_config(tmp, *, roots=(ROOT_DP, ROOT_MB), cwd_also=(RESEARCH,), exclude_cwd=(ATLAS_CWD,),
-                exclude_ids=()):
-    """Write a temp config.toml (absolute work/knowledge/source paths) and load it with atlas.load_config."""
+def make_config(tmp, *, roots=(ROOT_DP, ROOT_MB), cwd_also=(RESEARCH,), exclude_cwd=(ATLAS_CWD,), exclude_ids=()):
+    """Write a temp config.toml (absolute work/knowledge/source paths) and load it with load_config."""
     tmp = Path(tmp)
     tmp.mkdir(parents=True, exist_ok=True)
 
@@ -72,38 +79,42 @@ def make_config(tmp, *, roots=(ROOT_DP, ROOT_MB), cwd_also=(RESEARCH,), exclude_
     def arr(xs):
         return "[" + ", ".join(s(x) for x in xs) + "]"
 
-    lines = [
-        "[sources]",
-        f"codex_sessions = {s(tmp / 'codex' / 'sessions')}",
-        f"codex_session_index = {s(tmp / 'codex' / 'session_index.jsonl')}",
-        f"claude_projects = {s(tmp / 'claude' / 'projects')}",
-        "",
-        "[project]",
-        'name = "demo_project"',
-        f"work_dir = {s(tmp / 'work')}",
-        f"knowledge_dir = {s(tmp / 'knowledge')}",
-        f"roots = {arr(roots)}",
-        f"cwd_also = {arr(cwd_also)}",
-        f"exclude_cwd = {arr(exclude_cwd)}",
-        f"exclude_ids = {arr(exclude_ids)}",
-        "",
-        "[paths]",
-        f"roots = {arr(PATH_ROOTS)}",
-        "verify_timeout_s = 1",
-        "max_session_ids = 20",
-        "",
-        "[limits]",
-    ] + [f"{k} = {v}" for k, v in LIMITS.items()] + [
-        "",
-        "[knowledge]",
-        f"abbreviations = {{ DP = {s(ROOT_DP)}, RIG = {s(ROOT_DP + '/experiment/rig')}, "
-        f"EXP = {s('/mnt/nas_data/lab/data/site/exports')} }}",
-        "new_path_min_sessions = 1",
-        "",
-    ]
+    lines = (
+        [
+            "[sources]",
+            f"codex_sessions = {s(tmp / 'codex' / 'sessions')}",
+            f"codex_session_index = {s(tmp / 'codex' / 'session_index.jsonl')}",
+            f"claude_projects = {s(tmp / 'claude' / 'projects')}",
+            "",
+            "[project]",
+            'name = "demo_project"',
+            f"work_dir = {s(tmp / 'work')}",
+            f"knowledge_dir = {s(tmp / 'knowledge')}",
+            f"roots = {arr(roots)}",
+            f"cwd_also = {arr(cwd_also)}",
+            f"exclude_cwd = {arr(exclude_cwd)}",
+            f"exclude_ids = {arr(exclude_ids)}",
+            "",
+            "[paths]",
+            f"roots = {arr(PATH_ROOTS)}",
+            "verify_timeout_s = 1",
+            "max_session_ids = 20",
+            "",
+            "[limits]",
+        ]
+        + [f"{k} = {v}" for k, v in LIMITS.items()]
+        + [
+            "",
+            "[knowledge]",
+            f"abbreviations = {{ DP = {s(ROOT_DP)}, RIG = {s(ROOT_DP + '/experiment/rig')}, "
+            f"EXP = {s('/mnt/nas_data/lab/data/site/exports')} }}",
+            "new_path_min_sessions = 1",
+            "",
+        ]
+    )
     path = tmp / "config.toml"
     path.write_text("\n".join(lines), encoding="utf-8")
-    return atlas.load_config(path), path
+    return load_config(path), path
 
 
 class TempAtlasCase(unittest.TestCase):
@@ -114,8 +125,8 @@ class TempAtlasCase(unittest.TestCase):
         self.addCleanup(td.cleanup)
         self.tmp = Path(td.name)
         self.cfg, self.cfg_path = make_config(self.tmp)
-        self.rx = atlas.path_regex(self.cfg["paths"]["roots"])
-        self.rx_proj = atlas.path_regex(self.cfg["project"]["roots"])
+        self.rx = path_regex(self.cfg["paths"]["roots"])
+        self.rx_proj = path_regex(self.cfg["project"]["roots"])
 
     def write_codex_rollout(self, records, name="rollout-2026-10-10T10-00-00-x.jsonl"):
         path = self.tmp / name
@@ -127,7 +138,7 @@ class TempAtlasCase(unittest.TestCase):
         path = self.write_codex_rollout(records)
         meta = meta if meta is not None else records[0]["payload"]
         body = self.tmp / "codex_body.md"
-        st = atlas.codex_condense(path, kind, parent_path, meta, self.rx, self.rx_proj, LIMITS, body)
+        st = codex_condense(path, kind, parent_path, meta, self.rx, self.rx_proj, LIMITS, body)
         return st, body.read_text(encoding="utf-8")
 
     def condense_claude(self, records, subagent=False):
@@ -135,7 +146,7 @@ class TempAtlasCase(unittest.TestCase):
         path = self.tmp / "session.jsonl"
         dump_jsonl(path, records)
         body = self.tmp / "claude_body.md"
-        st = atlas.claude_condense(path, subagent, self.rx, self.rx_proj, LIMITS, body)
+        st = claude_condense(path, subagent, self.rx, self.rx_proj, LIMITS, body)
         return st, body.read_text(encoding="utf-8")
 
 
@@ -143,9 +154,17 @@ class TempAtlasCase(unittest.TestCase):
 # Record builders (synthetic transcripts)
 # ---------------------------------------------------------------------------
 
+
 def cx_meta(cid, cwd=ROOT_DP, source="cli", **extra):
-    payload = {"id": cid, "session_id": cid, "cwd": cwd, "timestamp": TS, "cli_version": "0.161.0",
-               "base_instructions": "BASE_INSTRUCTIONS_SECRET", "source": source}
+    payload = {
+        "id": cid,
+        "session_id": cid,
+        "cwd": cwd,
+        "timestamp": TS,
+        "cli_version": "0.161.0",
+        "base_instructions": "BASE_INSTRUCTIONS_SECRET",
+        "source": source,
+    }
     payload.update(extra)
     return {"timestamp": TS, "type": "session_meta", "payload": payload}
 
@@ -162,23 +181,37 @@ def cx_msg(role, text, phase=None, ts=TS, ordinal=None):
 
 
 def cx_call(name, args, call_id="call_1"):
-    return {"timestamp": TS, "type": "response_item",
-            "payload": {"type": "function_call", "name": name, "arguments": json.dumps(args), "call_id": call_id}}
+    return {
+        "timestamp": TS,
+        "type": "response_item",
+        "payload": {"type": "function_call", "name": name, "arguments": json.dumps(args), "call_id": call_id},
+    }
 
 
 def cx_output(text, call_id="call_1"):
-    return {"timestamp": TS, "type": "response_item",
-            "payload": {"type": "function_call_output", "call_id": call_id, "output": text}}
+    return {
+        "timestamp": TS,
+        "type": "response_item",
+        "payload": {"type": "function_call_output", "call_id": call_id, "output": text},
+    }
 
 
 def cx_custom(name, text, call_id="custom_1"):
-    return {"timestamp": TS, "type": "response_item",
-            "payload": {"type": "custom_tool_call", "name": name, "input": text, "call_id": call_id}}
+    return {
+        "timestamp": TS,
+        "type": "response_item",
+        "payload": {"type": "custom_tool_call", "name": name, "input": text, "call_id": call_id},
+    }
 
 
 def cl_user(text, origin="human", ts=TS, **extra):
-    rec = {"type": "user", "timestamp": ts, "cwd": ROOT_DP, "version": "2.0.1",
-           "message": {"role": "user", "content": text}}
+    rec = {
+        "type": "user",
+        "timestamp": ts,
+        "cwd": ROOT_DP,
+        "version": "2.0.1",
+        "message": {"role": "user", "content": text},
+    }
     if origin is not None:
         rec["origin"] = {"kind": origin}
     rec.update(extra)
@@ -186,8 +219,13 @@ def cl_user(text, origin="human", ts=TS, **extra):
 
 
 def cl_block(block, mid="msg_1", idx=0, stop=None, cwd=ROOT_DP, ts=TS):
-    return {"type": "assistant", "timestamp": ts, "cwd": cwd, "apiBlockIndex": idx,
-            "message": {"id": mid, "role": "assistant", "stop_reason": stop, "content": [block]}}
+    return {
+        "type": "assistant",
+        "timestamp": ts,
+        "cwd": cwd,
+        "apiBlockIndex": idx,
+        "message": {"id": mid, "role": "assistant", "stop_reason": stop, "content": [block]},
+    }
 
 
 def cl_text(text, mid="msg_1", idx=0, stop=None):
@@ -199,9 +237,12 @@ def cl_tool(name, inp, mid="msg_1", idx=0, stop=None):
 
 
 def cl_tool_result(text, tool_use_result=None):
-    rec = {"type": "user", "timestamp": TS, "cwd": ROOT_DP,
-           "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_1",
-                                                    "content": text}]}}
+    rec = {
+        "type": "user",
+        "timestamp": TS,
+        "cwd": ROOT_DP,
+        "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_1", "content": text}]},
+    }
     if tool_use_result is not None:
         rec["toolUseResult"] = tool_use_result
     return rec
@@ -211,8 +252,8 @@ def cl_tool_result(text, tool_use_result=None):
 # 1. Codex user text (codex_user_part)
 # ---------------------------------------------------------------------------
 
-class CodexUserTextTests(unittest.TestCase):
 
+class CodexUserTextTests(unittest.TestCase):
     def test_injected_parts_are_dropped(self):
         # docs/02 "Codex: what to keep", user text drop list.
         injected = [
@@ -225,41 +266,44 @@ class CodexUserTextTests(unittest.TestCase):
         ]
         for text in injected:
             with self.subTest(prefix=text[:30]):
-                self.assertIsNone(atlas.codex_user_part(text, LIMITS))
+                self.assertIsNone(codex_user_part(text, LIMITS))
 
     def test_ide_context_keeps_only_text_after_my_request_marker(self):
-        text = ("# Context from my IDE setup:\n\n## Active file: /x/y.py\nIDE_NOISE_LINE\n\n"
-                "## My request for Codex:\nPlease rerun the 0920 baseline check")
-        self.assertEqual(atlas.codex_user_part(text, LIMITS),
-                         ("USER", "\nPlease rerun the 0920 baseline check"))
+        text = (
+            "# Context from my IDE setup:\n\n## Active file: /x/y.py\nIDE_NOISE_LINE\n\n"
+            "## My request for Codex:\nPlease rerun the 0920 baseline check"
+        )
+        self.assertEqual(codex_user_part(text, LIMITS), ("USER", "\nPlease rerun the 0920 baseline check"))
 
     def test_internal_context_keeps_only_objective_as_goal(self):
-        text = ("<codex_internal_context version=2>\n<objective>Find the 0920 sensor reference</objective>\n"
-                "<scratch>INTERNAL_SCRATCH</scratch>\n</codex_internal_context>")
-        label, body = atlas.codex_user_part(text, LIMITS)
+        text = (
+            "<codex_internal_context version=2>\n<objective>Find the 0920 sensor reference</objective>\n"
+            "<scratch>INTERNAL_SCRATCH</scratch>\n</codex_internal_context>"
+        )
+        label, body = codex_user_part(text, LIMITS)
         self.assertEqual(label, "GOAL")
         self.assertEqual(body.strip(), "Find the 0920 sensor reference")
         self.assertNotIn("INTERNAL_SCRATCH", body)
 
     def test_subagent_notification_is_subagent_result(self):
         text = "<subagent_notification>\nworker finished: 3 files checked\n</subagent_notification>"
-        label, body = atlas.codex_user_part(text, LIMITS)
+        label, body = codex_user_part(text, LIMITS)
         self.assertEqual(label, "SUBAGENT RESULT")
         self.assertIn("worker finished", body)
 
     def test_ordinary_text_is_user(self):
-        self.assertEqual(atlas.codex_user_part("What is the pilot dataset?", LIMITS),
-                         ("USER", "What is the pilot dataset?"))
+        self.assertEqual(codex_user_part("What is the pilot dataset?", LIMITS), ("USER", "What is the pilot dataset?"))
 
     def test_question_reply_is_kept_as_user_text(self):
         # docs/02 keeps the user's answers to the agent's questions.
         text = "<send_user_message_question_reply>\nYes, use night 2\n</send_user_message_question_reply>"
-        self.assertEqual(atlas.codex_user_part(text, LIMITS), ("USER", text))
+        self.assertEqual(codex_user_part(text, LIMITS), ("USER", text))
 
 
 # ---------------------------------------------------------------------------
 # 2. Codex condense, end to end (root rollout)
 # ---------------------------------------------------------------------------
+
 
 def root_rollout():
     """A root session with every record kind the parser must keep or drop (docs/02 Codex lists)."""
@@ -270,9 +314,15 @@ def root_rollout():
         cx_msg("user", "<environment_context>\n<cwd>/x</cwd>\nENV_SECRET\n</environment_context>"),
         cx_msg("user", "Find the 0920 baseline signal folder", ts=TS),
         {"timestamp": TS, "type": "turn_context", "payload": {"cwd": ROOT_DP, "model": "TURN_CONTEXT_SECRET"}},
-        {"timestamp": TS, "type": "response_item",
-         "payload": {"type": "reasoning", "summary": [{"type": "summary_text", "text": "REASONING_SECRET"}],
-                     "encrypted_content": "gAAAAAencrypted"}},
+        {
+            "timestamp": TS,
+            "type": "response_item",
+            "payload": {
+                "type": "reasoning",
+                "summary": [{"type": "summary_text", "text": "REASONING_SECRET"}],
+                "encrypted_content": "gAAAAAencrypted",
+            },
+        },
         cx_msg("assistant", "Listing the recording folder first.", phase="commentary", ts=TS2),
         cx_call("exec_command", {"cmd": "ls /mnt/nas_data/lab/data/site/exports", "workdir": ROOT_DP}),
         cx_output("TOOL_OUTPUT_SECRET listing\n" + NAS_RECORDING),
@@ -282,11 +332,17 @@ def root_rollout():
 
 
 class CodexCondenseTests(TempAtlasCase):
-
     def test_base_instructions_developer_and_reasoning_never_written(self):
         _, body = self.condense_codex(root_rollout())
-        for secret in ("BASE_INSTRUCTIONS_SECRET", "DEVELOPER_SECRET", "REASONING_SECRET", "AGENTS_SECRET",
-                       "ENV_SECRET", "TURN_CONTEXT_SECRET", "TOKEN_SECRET"):
+        for secret in (
+            "BASE_INSTRUCTIONS_SECRET",
+            "DEVELOPER_SECRET",
+            "REASONING_SECRET",
+            "AGENTS_SECRET",
+            "ENV_SECRET",
+            "TURN_CONTEXT_SECRET",
+            "TOKEN_SECRET",
+        ):
             with self.subTest(secret=secret):
                 self.assertNotIn(secret, body)
 
@@ -308,8 +364,8 @@ class CodexCondenseTests(TempAtlasCase):
     def test_session_cwd_and_timestamps_are_tracked(self):
         st, _ = self.condense_codex(root_rollout())
         self.assertEqual(st["cwd"], ROOT_DP)
-        self.assertEqual(st["start"], atlas.parse_ts(TS))
-        self.assertEqual(st["end"], atlas.parse_ts(TS2))
+        self.assertEqual(st["start"], parse_ts(TS))
+        self.assertEqual(st["end"], parse_ts(TS2))
         self.assertEqual(st["n_user"], 1)
 
     def test_commentary_is_labelled_agent_not_final(self):
@@ -323,50 +379,65 @@ class CodexCondenseTests(TempAtlasCase):
         with open(path, "a", encoding="utf-8") as fh:
             fh.write('{"timestamp": "2026-10-10T10:06:00.000Z", "type": "response_item", "payl')
         out = self.tmp / "partial_body.md"
-        atlas.codex_condense(path, "root", None, records[0]["payload"], self.rx, self.rx_proj, LIMITS, out)
+        codex_condense(path, "root", None, records[0]["payload"], self.rx, self.rx_proj, LIMITS, out)
         self.assertIn("The 0920 folder is the 5-1 room recording.", out.read_text(encoding="utf-8"))
 
     def test_compaction_summary_is_skipped_when_already_in_an_agent_message(self):
         # docs/02: skip compacted.message if its first 200 chars already appeared in an emitted assistant message.
         summary = "Summary of the session so far: " + "x" * 220
-        records = [cx_meta(CX_ROOT), cx_msg("assistant", summary, phase="final_answer"),
-                   {"timestamp": TS, "type": "compacted", "payload": {"message": summary}}]
+        records = [
+            cx_meta(CX_ROOT),
+            cx_msg("assistant", summary, phase="final_answer"),
+            {"timestamp": TS, "type": "compacted", "payload": {"message": summary}},
+        ]
         _, body = self.condense_codex(records)
         self.assertEqual(labels(body), ["AGENT (final)"])
 
     def test_compaction_summary_is_kept_when_new(self):
-        records = [cx_meta(CX_ROOT), cx_msg("user", "start"),
-                   {"timestamp": TS, "type": "compacted", "payload": {"message": "NEW_COMPACTION_SUMMARY text"}}]
+        records = [
+            cx_meta(CX_ROOT),
+            cx_msg("user", "start"),
+            {"timestamp": TS, "type": "compacted", "payload": {"message": "NEW_COMPACTION_SUMMARY text"}},
+        ]
         _, body = self.condense_codex(records)
         self.assertIn("NEW_COMPACTION_SUMMARY text", body)
 
 
 class CodexToolInputTests(TempAtlasCase):
-
     def test_exec_js_cell_yields_command_and_workdir(self):
-        js = ('const r = await tools.exec_command({cmd: "/opt/conda/bin/python atlas.py paths", '
-              'workdir: "/home/user/ResearchAtlas"});')
+        js = (
+            'const r = await tools.exec_command({cmd: "/opt/conda/bin/python atlas.py paths", '
+            'workdir: "/home/user/ResearchAtlas"});'
+        )
         _, body = self.condense_codex([cx_meta(CX_ROOT), cx_custom("exec", js)])
         self.assertIn("`$ /opt/conda/bin/python atlas.py paths` (in /home/user/ResearchAtlas)", body)
 
     def test_apply_patch_yields_target_paths_not_patch_body(self):
-        patch = ("*** Begin Patch\n*** Update File: " + ROOT_DP + "/tools/loader.py\n"
-                 "@@\n-PATCH_OLD_LINE\n+PATCH_NEW_LINE\n*** End Patch")
+        patch = (
+            "*** Begin Patch\n*** Update File: " + ROOT_DP + "/tools/loader.py\n"
+            "@@\n-PATCH_OLD_LINE\n+PATCH_NEW_LINE\n*** End Patch"
+        )
         _, body = self.condense_codex([cx_meta(CX_ROOT), cx_custom("apply_patch", patch)])
         self.assertIn("- patch: " + ROOT_DP + "/tools/loader.py", body)
         self.assertNotIn("PATCH_OLD_LINE", body)
 
     def test_polling_and_wait_calls_are_dropped(self):
-        records = [cx_meta(CX_ROOT), cx_call("wait_agent", {"targets": ["worker"]}, "c1"),
-                   cx_call("sleep", {"seconds": 5}, "c2"), cx_call("write_stdin", {"chars": "POLL_INPUT"}, "c3")]
+        records = [
+            cx_meta(CX_ROOT),
+            cx_call("wait_agent", {"targets": ["worker"]}, "c1"),
+            cx_call("sleep", {"seconds": 5}, "c2"),
+            cx_call("write_stdin", {"chars": "POLL_INPUT"}, "c3"),
+        ]
         _, body = self.condense_codex(records)
         self.assertNotIn("wait_agent", body)
         self.assertNotIn("sleep", body)
         self.assertNotIn("POLL_INPUT", body)
 
     def test_encrypted_message_body_is_not_written_but_target_is(self):
-        records = [cx_meta(CX_ROOT),
-                   cx_call("send_message", {"target": "worker-1", "message": "gAAAAABencryptedblob"}, "c1")]
+        records = [
+            cx_meta(CX_ROOT),
+            cx_call("send_message", {"target": "worker-1", "message": "gAAAAABencryptedblob"}, "c1"),
+        ]
         _, body = self.condense_codex(records)
         self.assertIn("send_message → worker-1", body)
         self.assertNotIn("gAAAAA", body)
@@ -376,17 +447,18 @@ class CodexToolInputTests(TempAtlasCase):
 # 3. Codex fork and subagent rules (docs/02: session classes)
 # ---------------------------------------------------------------------------
 
-class CodexForkTests(TempAtlasCase):
 
+class CodexForkTests(TempAtlasCase):
     def test_fork_with_start_ordinal_skips_records_before_start(self):
         parent_id = CX_ROOT
-        meta = cx_meta(CX_CHILD, cwd=ROOT_DP, forked_from_id=parent_id,
-                       subagent_history_start_ordinal=2)
-        records = [meta,
-                   cx_msg("user", "INHERITED_USER_TEXT", ordinal=0),
-                   cx_msg("assistant", "INHERITED_AGENT_TEXT", phase="final_answer", ordinal=1),
-                   cx_msg("user", "CHILD_OWN_USER_TEXT", ordinal=2),
-                   cx_msg("assistant", "CHILD_OWN_AGENT_TEXT", phase="final_answer", ordinal=3)]
+        meta = cx_meta(CX_CHILD, cwd=ROOT_DP, forked_from_id=parent_id, subagent_history_start_ordinal=2)
+        records = [
+            meta,
+            cx_msg("user", "INHERITED_USER_TEXT", ordinal=0),
+            cx_msg("assistant", "INHERITED_AGENT_TEXT", phase="final_answer", ordinal=1),
+            cx_msg("user", "CHILD_OWN_USER_TEXT", ordinal=2),
+            cx_msg("assistant", "CHILD_OWN_AGENT_TEXT", phase="final_answer", ordinal=3),
+        ]
         _, body = self.condense_codex(records, kind="fork", meta=meta["payload"])
         self.assertNotIn("INHERITED_USER_TEXT", body)
         self.assertNotIn("INHERITED_AGENT_TEXT", body)
@@ -395,77 +467,88 @@ class CodexForkTests(TempAtlasCase):
         self.assertEqual(labels(body), ["USER", "AGENT (final)"])
 
     def test_fork_without_start_drops_payloads_copied_from_parent(self):
-        shared_user = ("Please rerun the full baseline follow-up with the corrected sensor sync, "
-                       "keeping the earlier 0920 results for comparison")
-        shared_agent = ("Rerun done. The corrected sensor sync lowers the error on the 0920 night "
-                        "but the 0813 result is unchanged.")
-        parent_records = [cx_meta(CX_ROOT), cx_msg("user", shared_user, ts=TS),
-                          cx_msg("assistant", shared_agent, phase="final_answer", ts=TS2)]
+        shared_user = (
+            "Please rerun the full baseline follow-up with the corrected sensor sync, "
+            "keeping the earlier 0920 results for comparison"
+        )
+        shared_agent = (
+            "Rerun done. The corrected sensor sync lowers the error on the 0920 night but the 0813 result is unchanged."
+        )
+        parent_records = [
+            cx_meta(CX_ROOT),
+            cx_msg("user", shared_user, ts=TS),
+            cx_msg("assistant", shared_agent, phase="final_answer", ts=TS2),
+        ]
         parent_path = self.write_codex_rollout(parent_records, name="parent.jsonl")
         child_meta = cx_meta(CX_CHILD, forked_from_id=CX_ROOT)
-        child_records = [child_meta,
-                         cx_msg("user", shared_user, ts=TS),
-                         cx_msg("assistant", shared_agent, phase="final_answer", ts=TS2),
-                         cx_msg("user", "CHILD_NEW_USER_TEXT", ts=TS2)]
-        _, body = self.condense_codex(child_records, kind="fork", parent_path=parent_path,
-                                      meta=child_meta["payload"])
+        child_records = [
+            child_meta,
+            cx_msg("user", shared_user, ts=TS),
+            cx_msg("assistant", shared_agent, phase="final_answer", ts=TS2),
+            cx_msg("user", "CHILD_NEW_USER_TEXT", ts=TS2),
+        ]
+        _, body = self.condense_codex(child_records, kind="fork", parent_path=parent_path, meta=child_meta["payload"])
         self.assertNotIn("Rerun done", body)
         self.assertNotIn("rerun the full baseline", body)
         self.assertIn("CHILD_NEW_USER_TEXT", body)
 
     def test_spawned_subagent_first_user_message_is_task_from_parent(self):
-        meta = cx_meta(CX_CHILD, source={"subagent": {"thread_spawn": {"parent_thread_id": CX_ROOT}}},
-                       parent_thread_id=CX_ROOT)
-        records = [meta,
-                   cx_msg("user", "# AGENTS.md instructions for /x\n\nAGENTS_SECRET"),
-                   cx_msg("user", "TASK_TEXT_FROM_PARENT: audit the 0920 folder"),
-                   cx_msg("assistant", "DONE_TEXT", phase="final_answer"),
-                   cx_msg("user", "LATER_FOLLOWUP_TEXT")]
+        meta = cx_meta(
+            CX_CHILD, source={"subagent": {"thread_spawn": {"parent_thread_id": CX_ROOT}}}, parent_thread_id=CX_ROOT
+        )
+        records = [
+            meta,
+            cx_msg("user", "# AGENTS.md instructions for /x\n\nAGENTS_SECRET"),
+            cx_msg("user", "TASK_TEXT_FROM_PARENT: audit the 0920 folder"),
+            cx_msg("assistant", "DONE_TEXT", phase="final_answer"),
+            cx_msg("user", "LATER_FOLLOWUP_TEXT"),
+        ]
         _, body = self.condense_codex(records, kind="subagent", meta=meta["payload"])
         self.assertEqual(labels(body), ["TASK (from parent)", "AGENT (final)", "USER"])
         self.assertNotIn("AGENTS_SECRET", body)
 
 
 class CodexClassTests(unittest.TestCase):
-
     def test_guardian_is_classified_guardian(self):
         meta = {"source": {"subagent": {"other": "guardian"}}, "parent_thread_id": CX_ROOT}
-        self.assertEqual(atlas.codex_class(meta), "guardian")
+        self.assertEqual(codex_class(meta), "guardian")
 
     def test_spawned_subagent_by_thread_spawn_source(self):
         meta = {"source": {"subagent": {"thread_spawn": {"parent_thread_id": CX_ROOT}}}}
-        self.assertEqual(atlas.codex_class(meta), "subagent")
+        self.assertEqual(codex_class(meta), "subagent")
 
     def test_spawned_subagent_by_parent_thread_id(self):
         meta = {"source": "cli", "parent_thread_id": CX_ROOT}
-        self.assertEqual(atlas.codex_class(meta), "subagent")
+        self.assertEqual(codex_class(meta), "subagent")
 
     def test_fork_by_forked_from_id(self):
         meta = {"source": "cli", "forked_from_id": CX_ROOT, "subagent_history_start_ordinal": 5}
-        self.assertEqual(atlas.codex_class(meta), "fork")
+        self.assertEqual(codex_class(meta), "fork")
 
     def test_root_sources(self):
         for source in ("cli", "vscode", "exec"):
             with self.subTest(source=source):
-                self.assertEqual(atlas.codex_class({"source": source, "cwd": ROOT_DP}), "root")
+                self.assertEqual(codex_class({"source": source, "cwd": ROOT_DP}), "root")
 
     def test_guardian_wins_over_fork_fields(self):
         meta = {"source": {"subagent": {"other": "guardian"}}, "forked_from_id": CX_ROOT}
-        self.assertEqual(atlas.codex_class(meta), "guardian")
+        self.assertEqual(codex_class(meta), "guardian")
 
 
 # ---------------------------------------------------------------------------
 # 5. Claude condense (claude_condense)
 # ---------------------------------------------------------------------------
 
-class ClaudeUserTextTests(TempAtlasCase):
 
+class ClaudeUserTextTests(TempAtlasCase):
     def test_only_human_string_content_counts_as_user(self):
-        records = [cl_user("Where is the pilot data?"),
-                   cl_user("NO_ORIGIN_STR_TEXT", origin=None),
-                   cl_user("LIST_CONTENT_TEXT", origin="human") | {"message": {"role": "user", "content": [
-                       {"type": "text", "text": "LIST_CONTENT_TEXT"}]}},
-                   cl_text("ok", stop="end_turn")]
+        records = [
+            cl_user("Where is the pilot data?"),
+            cl_user("NO_ORIGIN_STR_TEXT", origin=None),
+            cl_user("LIST_CONTENT_TEXT", origin="human")
+            | {"message": {"role": "user", "content": [{"type": "text", "text": "LIST_CONTENT_TEXT"}]}},
+            cl_text("ok", stop="end_turn"),
+        ]
         _, body = self.condense_claude(records)
         self.assertEqual(labels(body), ["USER", "AGENT (final)"])
         self.assertIn("Where is the pilot data?", body)
@@ -473,21 +556,24 @@ class ClaudeUserTextTests(TempAtlasCase):
         self.assertNotIn("LIST_CONTENT_TEXT", body)
 
     def test_task_notification_and_peer_origins_are_dropped(self):
-        records = [cl_user("<task-notification>TASK_NOTIFICATION_BODY</task-notification>",
-                           origin="task-notification"),
-                   cl_user("PEER_MESSAGE_BODY", origin="peer"),
-                   cl_user("REAL_HUMAN_TEXT")]
+        records = [
+            cl_user("<task-notification>TASK_NOTIFICATION_BODY</task-notification>", origin="task-notification"),
+            cl_user("PEER_MESSAGE_BODY", origin="peer"),
+            cl_user("REAL_HUMAN_TEXT"),
+        ]
         _, body = self.condense_claude(records)
         self.assertNotIn("TASK_NOTIFICATION_BODY", body)
         self.assertNotIn("PEER_MESSAGE_BODY", body)
         self.assertEqual(labels(body), ["USER"])
 
     def test_injected_human_prefixes_are_dropped(self):
-        injected = ["[Image: original 1920x1080, displayed at 1024x576]",
-                    "<local-command-caveat>CAVEAT_BODY</local-command-caveat>",
-                    "<command-name>/clear</command-name>",
-                    "<local-command-stdout>STDOUT_BODY</local-command-stdout>",
-                    "Base directory for this skill: /home/user/skills/x SKILL_BODY"]
+        injected = [
+            "[Image: original 1920x1080, displayed at 1024x576]",
+            "<local-command-caveat>CAVEAT_BODY</local-command-caveat>",
+            "<command-name>/clear</command-name>",
+            "<local-command-stdout>STDOUT_BODY</local-command-stdout>",
+            "Base directory for this skill: /home/user/skills/x SKILL_BODY",
+        ]
         records = [cl_user(t) for t in injected] + [cl_user("REAL_HUMAN_TEXT")]
         _, body = self.condense_claude(records)
         for t in ("CAVEAT_BODY", "STDOUT_BODY", "SKILL_BODY", "[Image:", "<command-name>"):
@@ -496,12 +582,17 @@ class ClaudeUserTextTests(TempAtlasCase):
         self.assertEqual(labels(body), ["USER"])
 
     def test_attachments_and_non_keep_record_types_are_dropped(self):
-        records = [{"type": "attachment", "timestamp": TS,
-                    "attachment": {"type": "instructions", "content": "ATTACHMENT_SECRET agents.md"}},
-                   {"type": "queue-operation", "timestamp": TS, "content": "QUEUE_SECRET"},
-                   {"type": "last-prompt", "timestamp": TS, "lastPrompt": "LASTPROMPT_SECRET"},
-                   {"type": "system", "subtype": "compact_boundary", "timestamp": TS, "content": "SYSTEM_SECRET"},
-                   cl_user("REAL_HUMAN_TEXT")]
+        records = [
+            {
+                "type": "attachment",
+                "timestamp": TS,
+                "attachment": {"type": "instructions", "content": "ATTACHMENT_SECRET agents.md"},
+            },
+            {"type": "queue-operation", "timestamp": TS, "content": "QUEUE_SECRET"},
+            {"type": "last-prompt", "timestamp": TS, "lastPrompt": "LASTPROMPT_SECRET"},
+            {"type": "system", "subtype": "compact_boundary", "timestamp": TS, "content": "SYSTEM_SECRET"},
+            cl_user("REAL_HUMAN_TEXT"),
+        ]
         _, body = self.condense_claude(records)
         for t in ("ATTACHMENT_SECRET", "QUEUE_SECRET", "LASTPROMPT_SECRET", "SYSTEM_SECRET"):
             with self.subTest(text=t):
@@ -509,29 +600,36 @@ class ClaudeUserTextTests(TempAtlasCase):
 
 
 class ClaudeAgentTextTests(TempAtlasCase):
-
     def test_text_kept_thinking_dropped_and_final_marked(self):
-        records = [cl_block({"type": "thinking", "thinking": "THINKING_SECRET", "signature": "sig"}, mid="msg_1"),
-                   cl_text("Plan: check the sensor sync first.", mid="msg_1", idx=1),
-                   cl_text("Final: the sensor is 0920 reference.", mid="msg_2", idx=0, stop="end_turn"),
-                   cl_user("next question")]
+        records = [
+            cl_block({"type": "thinking", "thinking": "THINKING_SECRET", "signature": "sig"}, mid="msg_1"),
+            cl_text("Plan: check the sensor sync first.", mid="msg_1", idx=1),
+            cl_text("Final: the sensor is 0920 reference.", mid="msg_2", idx=0, stop="end_turn"),
+            cl_user("next question"),
+        ]
         _, body = self.condense_claude(records)
         self.assertNotIn("THINKING_SECRET", body)
         self.assertEqual(labels(body), ["AGENT", "AGENT (final)", "USER"])
         self.assertIn("Final: the sensor is 0920 reference.", body)
 
     def test_bash_command_and_read_path_are_kept(self):
-        records = [cl_tool("Bash", {"command": "ls /mnt/nas_data/lab/data", "description": "list"}, idx=0),
-                   cl_tool("Read", {"file_path": "/mnt/nas_data/lab/data/readme.txt"}, idx=1),
-                   cl_user("next")]
+        records = [
+            cl_tool("Bash", {"command": "ls /mnt/nas_data/lab/data", "description": "list"}, idx=0),
+            cl_tool("Read", {"file_path": "/mnt/nas_data/lab/data/readme.txt"}, idx=1),
+            cl_user("next"),
+        ]
         _, body = self.condense_claude(records)
         self.assertIn("- `$ ls /mnt/nas_data/lab/data` (in " + ROOT_DP + ")", body)
         self.assertIn("- Read /mnt/nas_data/lab/data/readme.txt", body)
 
     def test_edit_writes_file_path_not_contents(self):
-        records = [cl_tool("Edit", {"file_path": ROOT_DP + "/x.py", "old_string": "EDIT_OLD_SECRET",
-                                    "new_string": "EDIT_NEW_SECRET"}),
-                   cl_user("next")]
+        records = [
+            cl_tool(
+                "Edit",
+                {"file_path": ROOT_DP + "/x.py", "old_string": "EDIT_OLD_SECRET", "new_string": "EDIT_NEW_SECRET"},
+            ),
+            cl_user("next"),
+        ]
         _, body = self.condense_claude(records)
         self.assertIn("- Edit " + ROOT_DP + "/x.py", body)
         self.assertNotIn("EDIT_OLD_SECRET", body)
@@ -540,39 +638,50 @@ class ClaudeAgentTextTests(TempAtlasCase):
     def test_subagent_handback_is_kept_in_full(self):
         long_report = "REPORT " + ("filler line\n" * 400) + "END_OF_REPORT"
         self.assertGreater(len(long_report), LIMITS["subagent_result"])
-        records = [cl_user("TASK_FROM_PARENT", origin=None),
-                   cl_tool("SubagentHandback", {"message": long_report})]
+        records = [cl_user("TASK_FROM_PARENT", origin=None), cl_tool("SubagentHandback", {"message": long_report})]
         _, body = self.condense_claude(records, subagent=True)
         self.assertIn("SUBAGENT REPORT", labels(body))
         self.assertIn("END_OF_REPORT", body)
 
 
 class ClaudeSubagentAndRecapTests(TempAtlasCase):
-
     def test_subagent_first_user_record_is_task_from_parent(self):
-        records = [cl_user("TASK_TEXT_FROM_PARENT: summarise the 0920 folder", origin=None),
-                   cl_text("Working on it.", mid="msg_1"),
-                   cl_text("DONE_TEXT", mid="msg_2", stop="end_turn"),
-                   cl_user("HARNESS_META_TEXT", origin=None, isMeta=True)]
+        records = [
+            cl_user("TASK_TEXT_FROM_PARENT: summarise the 0920 folder", origin=None),
+            cl_text("Working on it.", mid="msg_1"),
+            cl_text("DONE_TEXT", mid="msg_2", stop="end_turn"),
+            cl_user("HARNESS_META_TEXT", origin=None, isMeta=True),
+        ]
         _, body = self.condense_claude(records, subagent=True)
         self.assertEqual(labels(body), ["TASK (from parent)", "AGENT", "AGENT (final)"])
         self.assertNotIn("HARNESS_META_TEXT", body)
 
     def test_away_summary_is_recap_and_other_system_records_dropped(self):
-        records = [{"type": "system", "subtype": "away_summary", "timestamp": TS,
-                    "content": "RECAP_TEXT: last session was about the pilot import"},
-                   {"type": "system", "subtype": "api_error", "timestamp": TS, "content": "SYSTEM_ERROR_TEXT"},
-                   cl_user("next")]
+        records = [
+            {
+                "type": "system",
+                "subtype": "away_summary",
+                "timestamp": TS,
+                "content": "RECAP_TEXT: last session was about the pilot import",
+            },
+            {"type": "system", "subtype": "api_error", "timestamp": TS, "content": "SYSTEM_ERROR_TEXT"},
+            cl_user("next"),
+        ]
         _, body = self.condense_claude(records)
         self.assertEqual(labels(body), ["RECAP", "USER"])
         self.assertIn("RECAP_TEXT", body)
         self.assertNotIn("SYSTEM_ERROR_TEXT", body)
 
     def test_tool_result_is_scanned_for_paths_but_not_written(self):
-        records = [cl_user("look"), cl_tool("Bash", {"command": "ls"}, idx=0),
-                   cl_tool_result("TOOL_RESULT_SECRET " + NAS_RECORDING,
-                                  tool_use_result={"stdout": "STDOUT_SECRET " + NAS_RECORDING_HHMMSS}),
-                   cl_user("next")]
+        records = [
+            cl_user("look"),
+            cl_tool("Bash", {"command": "ls"}, idx=0),
+            cl_tool_result(
+                "TOOL_RESULT_SECRET " + NAS_RECORDING,
+                tool_use_result={"stdout": "STDOUT_SECRET " + NAS_RECORDING_HHMMSS},
+            ),
+            cl_user("next"),
+        ]
         st, body = self.condense_claude(records)
         self.assertNotIn("TOOL_RESULT_SECRET", body)
         self.assertNotIn("STDOUT_SECRET", body)
@@ -581,8 +690,10 @@ class ClaudeSubagentAndRecapTests(TempAtlasCase):
 
     def test_original_file_and_patch_fields_are_not_scanned(self):
         # docs/02: skip originalFile / structuredPatch when scanning tool results.
-        tur = {"file": {"content": "ok", "originalFile": "/mnt/nas_data/ORIGINAL_ONLY.npy"},
-               "structuredPatch": [{"lines": ["/mnt/nas_data/PATCH_ONLY.npy"]}]}
+        tur = {
+            "file": {"content": "ok", "originalFile": "/mnt/nas_data/ORIGINAL_ONLY.npy"},
+            "structuredPatch": [{"lines": ["/mnt/nas_data/PATCH_ONLY.npy"]}],
+        }
         st, _ = self.condense_claude([cl_tool_result("short result", tool_use_result=tur), cl_user("next")])
         self.assertNotIn("/mnt/nas_data/ORIGINAL_ONLY.npy", st["hits"])
         self.assertNotIn("/mnt/nas_data/PATCH_ONLY.npy", st["hits"])
@@ -598,17 +709,26 @@ class ClaudeSubagentAndRecapTests(TempAtlasCase):
 # 6. Selection (select_candidates) and candidate discovery (discover_candidates)
 # ---------------------------------------------------------------------------
 
+
 def cand(source, kind, cid, cwd, parent_id=None):
     """Candidate dict shaped like discover_candidates() output (only the keys selection reads)."""
     short = cid[:13] if source == "codex" else cid[:8]
-    return {"source": source, "kind": kind, "id": cid, "short": short, "path": None, "parent_id": parent_id,
-            "cwd": cwd, "meta": {}, "key": (source, cid)}
+    return {
+        "source": source,
+        "kind": kind,
+        "id": cid,
+        "short": short,
+        "path": None,
+        "parent_id": parent_id,
+        "cwd": cwd,
+        "meta": {},
+        "key": (source, cid),
+    }
 
 
 class SelectionTests(TempAtlasCase):
-
     def select(self, cands, cfg=None):
-        return atlas.select_candidates(cands, cfg or self.cfg)
+        return select_candidates(cands, cfg or self.cfg)
 
     def test_cwd_under_root_is_selected_by_cwd(self):
         cands = [cand("codex", "root", CX_ROOT, ROOT_DP + "/experiment/rig")]
@@ -627,20 +747,23 @@ class SelectionTests(TempAtlasCase):
         self.assertEqual(self.select(cands), {})
 
     def test_cwd_under_exclude_cwd_is_never_selected(self):
-        cands = [cand("codex", "root", CX_ROOT, ATLAS_CWD + "/tests"),
-                 cand("claude", "root", "4ff003a4-0000-0000-0000-000000000000", ATLAS_CWD)]
+        cands = [
+            cand("codex", "root", CX_ROOT, ATLAS_CWD + "/tests"),
+            cand("claude", "root", "4ff003a4-0000-0000-0000-000000000000", ATLAS_CWD),
+        ]
         self.assertEqual(self.select(cands), {})
 
     def test_subagent_under_exclude_cwd_is_not_selected_even_with_selected_parent(self):
-        cands = [cand("codex", "root", CX_ROOT, ROOT_DP),
-                 cand("codex", "subagent", CX_CHILD, ATLAS_CWD, parent_id=CX_ROOT)]
+        cands = [
+            cand("codex", "root", CX_ROOT, ROOT_DP),
+            cand("codex", "subagent", CX_CHILD, ATLAS_CWD, parent_id=CX_ROOT),
+        ]
         sel = self.select(cands)
         self.assertEqual(sel, {("codex", CX_ROOT): "cwd"})
 
     def test_exclude_ids_prefix_excludes_the_session(self):
         cfg, _ = make_config(self.tmp / "excl", exclude_ids=["01a1700a-530c"])
-        cands = [cand("codex", "root", CX_EXCLUDED, ROOT_DP),
-                 cand("codex", "root", CX_ROOT, ROOT_DP)]
+        cands = [cand("codex", "root", CX_EXCLUDED, ROOT_DP), cand("codex", "root", CX_ROOT, ROOT_DP)]
         self.assertEqual(self.select(cands, cfg), {("codex", CX_ROOT): "cwd"})
 
     def test_children_of_excluded_session_are_excluded_transitively(self):
@@ -649,38 +772,48 @@ class SelectionTests(TempAtlasCase):
         # Child ids must not share the excluded prefix, or the prefix rule alone would exclude them.
         child = "01a17777-0001-7000-8000-000000000010"
         grandchild = "01a17777-0002-7000-8000-000000000011"
-        cands = [cand("codex", "root", CX_EXCLUDED, ROOT_DP),
-                 cand("codex", "subagent", child, ROOT_DP, parent_id=CX_EXCLUDED),
-                 cand("codex", "fork", grandchild, ROOT_DP, parent_id=child)]
+        cands = [
+            cand("codex", "root", CX_EXCLUDED, ROOT_DP),
+            cand("codex", "subagent", child, ROOT_DP, parent_id=CX_EXCLUDED),
+            cand("codex", "fork", grandchild, ROOT_DP, parent_id=child),
+        ]
         self.assertEqual(self.select(cands, cfg), {})
 
     def test_children_of_exclude_cwd_session_are_excluded_transitively(self):
         child = CX_CHILD
         grandchild = "01a1619b-c103-7000-8000-000000000009"
-        cands = [cand("codex", "root", CX_ROOT, ATLAS_CWD),
-                 cand("codex", "subagent", child, ROOT_DP, parent_id=CX_ROOT),
-                 cand("codex", "fork", grandchild, ROOT_DP, parent_id=child)]
+        cands = [
+            cand("codex", "root", CX_ROOT, ATLAS_CWD),
+            cand("codex", "subagent", child, ROOT_DP, parent_id=CX_ROOT),
+            cand("codex", "fork", grandchild, ROOT_DP, parent_id=child),
+        ]
         self.assertEqual(self.select(cands), {})
 
     def test_subagent_selected_by_selected_parent_when_cwd_is_elsewhere(self):
         child = CX_CHILD
         grandchild = "01a1619b-c103-7000-8000-000000000009"
-        cands = [cand("codex", "root", CX_ROOT, ROOT_DP),
-                 cand("codex", "subagent", child, OTHER_CWD, parent_id=CX_ROOT),
-                 cand("codex", "fork", grandchild, OTHER_CWD, parent_id=child)]
-        self.assertEqual(self.select(cands), {("codex", CX_ROOT): "cwd",
-                                              ("codex", child): "parent",
-                                              ("codex", grandchild): "parent"})
+        cands = [
+            cand("codex", "root", CX_ROOT, ROOT_DP),
+            cand("codex", "subagent", child, OTHER_CWD, parent_id=CX_ROOT),
+            cand("codex", "fork", grandchild, OTHER_CWD, parent_id=child),
+        ]
+        self.assertEqual(
+            self.select(cands), {("codex", CX_ROOT): "cwd", ("codex", child): "parent", ("codex", grandchild): "parent"}
+        )
 
     def test_child_of_unselected_parent_is_not_selected(self):
-        cands = [cand("codex", "root", CX_ROOT, OTHER_CWD),
-                 cand("codex", "subagent", CX_CHILD, OTHER_CWD, parent_id=CX_ROOT)]
+        cands = [
+            cand("codex", "root", CX_ROOT, OTHER_CWD),
+            cand("codex", "subagent", CX_CHILD, OTHER_CWD, parent_id=CX_ROOT),
+        ]
         self.assertEqual(self.select(cands), {})
 
     def test_claude_subagent_selected_by_parent_session(self):
         sid = "9f1e2d3c-0000-4000-8000-000000000001"
-        cands = [cand("claude", "root", sid, ROOT_DP),
-                 cand("claude", "subagent", "abcdef12-0000-4000-8000-000000000002", OTHER_CWD, parent_id=sid)]
+        cands = [
+            cand("claude", "root", sid, ROOT_DP),
+            cand("claude", "subagent", "abcdef12-0000-4000-8000-000000000002", OTHER_CWD, parent_id=sid),
+        ]
         sel = self.select(cands)
         self.assertEqual(sel[("claude", sid)], "cwd")
         self.assertEqual(sel[("claude", "abcdef12-0000-4000-8000-000000000002")], "parent")
@@ -693,8 +826,9 @@ class SelectionTests(TempAtlasCase):
         dump_jsonl(proj / sid / "subagents" / "agent-aaa111.jsonl", [cl_user("task", origin=None)])
         dump_jsonl(proj / sid / "subagents" / "agent-bbb222.jsonl", [cl_user("task", origin=None)])
         (proj / sid / "subagents" / "agent-bbb222.meta.json").write_text(
-            json.dumps({"parentAgentId": "aaa111"}), encoding="utf-8")
-        cands, guardians = atlas.discover_candidates(self.cfg, [])
+            json.dumps({"parentAgentId": "aaa111"}), encoding="utf-8"
+        )
+        cands, guardians = discover_candidates(self.cfg, [])
         self.assertEqual(guardians, 0)
         by_id = {c["id"]: c for c in cands}
         self.assertEqual(by_id[sid]["kind"], "root")
@@ -708,14 +842,14 @@ class SelectionTests(TempAtlasCase):
 # 7. Paths (path_regex, scan_paths, clean_path)
 # ---------------------------------------------------------------------------
 
-class PathHarvestTests(unittest.TestCase):
 
+class PathHarvestTests(unittest.TestCase):
     def setUp(self):
-        self.rx = atlas.path_regex(PATH_ROOTS)
+        self.rx = path_regex(PATH_ROOTS)
 
     def harvest(self, text):
         hits = {}
-        atlas.scan_paths(text, self.rx, hits)
+        scan_paths(text, self.rx, hits)
         return hits
 
     def test_recording_folder_with_space_is_kept_whole(self):
@@ -725,8 +859,7 @@ class PathHarvestTests(unittest.TestCase):
 
     def test_grep_context_suffix_is_stripped(self):
         # grep -n -A/-B output: "<file>-<line>-<text>" glues onto the path.
-        text = (ROOT_DP + "/experiment/loader.py-52-    x = 1\n"
-                "/mnt/nas_data/lab/notes.txt-7-more")
+        text = ROOT_DP + "/experiment/loader.py-52-    x = 1\n/mnt/nas_data/lab/notes.txt-7-more"
         self.assertEqual(set(self.harvest(text)), {ROOT_DP + "/experiment/loader.py", "/mnt/nas_data/lab/notes.txt"})
 
     def test_grep_match_colon_suffix_is_not_part_of_path(self):
@@ -735,7 +868,7 @@ class PathHarvestTests(unittest.TestCase):
     def test_trailing_punctuation_and_quotes_are_not_part_of_path(self):
         cases = {
             "end of sentence /mnt/nas_data/a/b.npy.": "/mnt/nas_data/a/b.npy",
-            "quoted \"/mnt/nas_data/a/b.npy\" here": "/mnt/nas_data/a/b.npy",
+            'quoted "/mnt/nas_data/a/b.npy" here': "/mnt/nas_data/a/b.npy",
             "single '/mnt/nas_data/a/b.npy' here": "/mnt/nas_data/a/b.npy",
             "backticks `/mnt/nas_data/a/b.npy`": "/mnt/nas_data/a/b.npy",
             "parens (/mnt/nas_data/a/b.npy)": "/mnt/nas_data/a/b.npy",
@@ -746,8 +879,10 @@ class PathHarvestTests(unittest.TestCase):
                 self.assertEqual(set(self.harvest(text)), {expected})
 
     def test_several_paths_in_a_list_are_each_trimmed(self):
-        self.assertEqual(set(self.harvest("list /mnt/nas_data/a/b.npy, /mnt/tmp/c.npy;")),
-                         {"/mnt/nas_data/a/b.npy", "/mnt/tmp/c.npy"})
+        self.assertEqual(
+            set(self.harvest("list /mnt/nas_data/a/b.npy, /mnt/tmp/c.npy;")),
+            {"/mnt/nas_data/a/b.npy", "/mnt/tmp/c.npy"},
+        )
 
     def test_paths_outside_configured_roots_are_ignored(self):
         text = "/home/user/other/x.npy /var/log/y.log /opt/tool/z /srv/data/w.npy"
@@ -763,15 +898,17 @@ class PathHarvestTests(unittest.TestCase):
         self.assertEqual(self.harvest(text), {"/mnt/nas_data/a.npy": 2})
 
     def test_clean_path_normalises_and_rejects_empty_or_overlong(self):
-        self.assertEqual(atlas.clean_path("/mnt/nas_data//a/./b.npy/"), "/mnt/nas_data/a/b.npy")
-        self.assertIsNone(atlas.clean_path("..."))
-        self.assertIsNone(atlas.clean_path("/mnt/nas_data/" + "x" * 400))
+        self.assertEqual(clean_path("/mnt/nas_data//a/./b.npy/"), "/mnt/nas_data/a/b.npy")
+        self.assertIsNone(clean_path("..."))
+        self.assertIsNone(clean_path("/mnt/nas_data/" + "x" * 400))
 
     def test_parentheses_inside_a_path_are_kept(self):
         # Real names such as "1x1(iw612)" (directory) and "tier1a_feat_PCA_(10D).png" (file) occur in transcripts.
-        cases = [ROOT_DP + "/dataPlan/test_case/1x1(iw612)/test_case1-1.yaml",
-                 ROOT_DP + "/experiment/rig/figures/tier1a_feat_PCA_(10D).png",
-                 ROOT_DP + "/dataPlan/test_case/2x2(synaptics)/.ipynb_checkpoints/test_case1-1-checkpoint.yaml"]
+        cases = [
+            ROOT_DP + "/dataPlan/test_case/1x1(iw612)/test_case1-1.yaml",
+            ROOT_DP + "/experiment/rig/figures/tier1a_feat_PCA_(10D).png",
+            ROOT_DP + "/dataPlan/test_case/2x2(synaptics)/.ipynb_checkpoints/test_case1-1-checkpoint.yaml",
+        ]
         for path in cases:
             with self.subTest(path=path):
                 self.assertEqual(set(self.harvest("see " + path + " now")), {path})
@@ -790,8 +927,7 @@ class PathHarvestTests(unittest.TestCase):
                 self.assertEqual(set(self.harvest(text)), {expected})
 
     def test_braces_and_brackets_still_end_a_path(self):
-        cases = {"/mnt/nas_data/a/b.npy]": "/mnt/nas_data/a/b.npy",
-                 "/mnt/nas_data/a/b.npy{x}": "/mnt/nas_data/a/b.npy"}
+        cases = {"/mnt/nas_data/a/b.npy]": "/mnt/nas_data/a/b.npy", "/mnt/nas_data/a/b.npy{x}": "/mnt/nas_data/a/b.npy"}
         for text, expected in cases.items():
             with self.subTest(text=text):
                 self.assertEqual(set(self.harvest(text)), {expected})
@@ -839,83 +975,103 @@ class PathHarvestTests(unittest.TestCase):
 # 8. Citations (expand_cited, cited_paths)
 # ---------------------------------------------------------------------------
 
-ABBREV = {"DP": ROOT_DP, "RIG": ROOT_DP + "/experiment/rig",
-          "EXP": "/mnt/nas_data/lab/data/site/exports"}
+ABBREV = {"DP": ROOT_DP, "RIG": ROOT_DP + "/experiment/rig", "EXP": "/mnt/nas_data/lab/data/site/exports"}
 
 
 class ExpandCitedTests(unittest.TestCase):
-
     def test_abbreviations_expand_to_absolute_paths(self):
-        self.assertEqual(atlas.expand_cited("DP/experiment/20260921_x", ABBREV),
-                         ROOT_DP + "/experiment/20260921_x")
-        self.assertEqual(atlas.expand_cited("RIG/20260922_0920_dataset/README.md", ABBREV),
-                         ROOT_DP + "/experiment/rig/20260922_0920_dataset/README.md")
-        self.assertEqual(atlas.expand_cited("EXP/rec_export_20261012_152940", ABBREV),
-                         "/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940")
+        self.assertEqual(expand_cited("DP/experiment/20260921_x", ABBREV), ROOT_DP + "/experiment/20260921_x")
+        self.assertEqual(
+            expand_cited("RIG/20260922_0920_dataset/README.md", ABBREV),
+            ROOT_DP + "/experiment/rig/20260922_0920_dataset/README.md",
+        )
+        self.assertEqual(
+            expand_cited("EXP/rec_export_20261012_152940", ABBREV),
+            "/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940",
+        )
 
     def test_absolute_span_is_returned_as_is(self):
-        self.assertEqual(atlas.expand_cited("/mnt/nas_data/lab/x.npy", ABBREV), "/mnt/nas_data/lab/x.npy")
+        self.assertEqual(expand_cited("/mnt/nas_data/lab/x.npy", ABBREV), "/mnt/nas_data/lab/x.npy")
 
     def test_templates_return_none(self):
-        templates = ["DP/experiment/<date>_x", "DP/experiment/{a,b}", "RIG/*.npy",
-                     "EXP/rec_export_YYYYMMDD", "EXP/files/HH:MM:SS", "EXP/data/20261010_HHMMSS"]
+        templates = [
+            "DP/experiment/<date>_x",
+            "DP/experiment/{a,b}",
+            "RIG/*.npy",
+            "EXP/rec_export_YYYYMMDD",
+            "EXP/files/HH:MM:SS",
+            "EXP/data/20261010_HHMMSS",
+        ]
         for span in templates:
             with self.subTest(span=span):
-                self.assertIsNone(atlas.expand_cited(span, ABBREV))
+                self.assertIsNone(expand_cited(span, ABBREV))
 
     def test_non_path_spans_return_none(self):
-        spans = ["pytest -q", "atlas.py", "sessions.jsonl", "[codex:01a1619b-8270 2026-10-22]",
-                 "DP", "knowledge/INDEX.md", "/", "", "[file:experiment/rig/x/README.md]"]
+        spans = [
+            "pytest -q",
+            "atlas.py",
+            "sessions.jsonl",
+            "[codex:01a1619b-8270 2026-10-22]",
+            "DP",
+            "knowledge/INDEX.md",
+            "/",
+            "",
+            "[file:experiment/rig/x/README.md]",
+        ]
         for span in spans:
             with self.subTest(span=span):
-                self.assertIsNone(atlas.expand_cited(span, ABBREV))
+                self.assertIsNone(expand_cited(span, ABBREV))
 
     def test_command_span_is_cut_at_first_space(self):
-        self.assertEqual(atlas.expand_cited("/opt/conda/bin/python atlas.py refresh", ABBREV),
-                         "/opt/conda/bin/python")
+        self.assertEqual(expand_cited("/opt/conda/bin/python atlas.py refresh", ABBREV), "/opt/conda/bin/python")
 
     def test_recording_time_stays_inside_the_span(self):
         span = "EXP/rec_export_20261012_152940/files/2026-10-10 17:45:04/002"
-        self.assertEqual(atlas.expand_cited(span, ABBREV),
-                         "/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940/"
-                         "files/2026-10-10 17:45:04/002")
+        self.assertEqual(
+            expand_cited(span, ABBREV),
+            "/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940/files/2026-10-10 17:45:04/002",
+        )
 
     def test_parenthesised_note_is_dropped(self):
-        self.assertEqual(atlas.expand_cited("DP/experiment/x (lead)", ABBREV), ROOT_DP + "/experiment/x")
+        self.assertEqual(expand_cited("DP/experiment/x (lead)", ABBREV), ROOT_DP + "/experiment/x")
 
 
 class CitedPathsTests(TempAtlasCase):
-
     def write_knowledge(self, name, text):
         kdir = self.cfg["project"]["knowledge_dir"]
         kdir.mkdir(parents=True, exist_ok=True)
         (kdir / name).write_text(text, encoding="utf-8")
 
     def test_reports_path_with_file_name_and_line_number(self):
-        self.write_knowledge("datasets.md",
-                             "# Datasets\n\n"
-                             "- raw signal: `DP/experiment/20260921_x` ✓ 2026-10-22\n"
-                             "- command: `/opt/conda/bin/python atlas.py refresh`\n")
-        cited = atlas.cited_paths(self.cfg)
-        self.assertEqual(cited, [(ROOT_DP + "/experiment/20260921_x", "datasets.md", 3),
-                                 ("/opt/conda/bin/python", "datasets.md", 4)])
+        self.write_knowledge(
+            "datasets.md",
+            "# Datasets\n\n"
+            "- raw signal: `DP/experiment/20260921_x` ✓ 2026-10-22\n"
+            "- command: `/opt/conda/bin/python atlas.py refresh`\n",
+        )
+        cited = cited_paths(self.cfg)
+        self.assertEqual(
+            cited, [(ROOT_DP + "/experiment/20260921_x", "datasets.md", 3), ("/opt/conda/bin/python", "datasets.md", 4)]
+        )
 
     def test_spans_followed_by_cross_mark_are_skipped(self):
         # docs/04 §4: ✗-marked citations are known-missing and are not re-reported.
-        self.write_knowledge("datasets.md", "- gone: `EXP/rec_export_29990101_000000` ✗ 2026-10-22\n"
-                                            "- here: `EXP/rec_export_20261012_152940` ✓ 2026-10-22\n")
-        cited = atlas.cited_paths(self.cfg)
-        self.assertEqual([p for p, _, _ in cited],
-                         ["/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940"])
+        self.write_knowledge(
+            "datasets.md",
+            "- gone: `EXP/rec_export_29990101_000000` ✗ 2026-10-22\n"
+            "- here: `EXP/rec_export_20261012_152940` ✓ 2026-10-22\n",
+        )
+        cited = cited_paths(self.cfg)
+        self.assertEqual([p for p, _, _ in cited], ["/mnt/nas_data/lab/data/site/exports/rec_export_20261012_152940"])
 
     def test_template_and_non_path_spans_are_not_cited(self):
         self.write_knowledge("INDEX.md", "- `DP/experiment/<date>_x` and `pytest -q` and `sessions.jsonl`\n")
-        self.assertEqual(atlas.cited_paths(self.cfg), [])
+        self.assertEqual(cited_paths(self.cfg), [])
 
     def test_all_knowledge_files_are_scanned_in_name_order(self):
         self.write_knowledge("open_questions.md", "`DP/experiment/b`\n")
         self.write_knowledge("datasets.md", "`DP/experiment/a`\n")
-        names = [name for _, name, _ in atlas.cited_paths(self.cfg)]
+        names = [name for _, name, _ in cited_paths(self.cfg)]
         self.assertEqual(names, ["datasets.md", "open_questions.md"])
 
 
@@ -923,23 +1079,23 @@ class CitedPathsTests(TempAtlasCase):
 # under()
 # ---------------------------------------------------------------------------
 
-class UnderTests(unittest.TestCase):
 
+class UnderTests(unittest.TestCase):
     def test_sibling_with_shared_string_prefix_is_not_under(self):
-        self.assertFalse(atlas.under("/a/bc", ["/a/b"]))
+        self.assertFalse(under("/a/bc", ["/a/b"]))
 
     def test_equal_path_counts_as_under(self):
-        self.assertTrue(atlas.under("/a/b", ["/a/b"]))
+        self.assertTrue(under("/a/b", ["/a/b"]))
 
     def test_child_path_is_under(self):
-        self.assertTrue(atlas.under("/a/b/c/d", ["/a/b"]))
+        self.assertTrue(under("/a/b/c/d", ["/a/b"]))
 
     def test_any_prefix_in_the_list_can_match(self):
-        self.assertTrue(atlas.under("/x/y", ["/a/b", "/x"]))
+        self.assertTrue(under("/x/y", ["/a/b", "/x"]))
 
     def test_missing_path_is_never_under(self):
-        self.assertFalse(atlas.under(None, ["/a/b"]))
-        self.assertFalse(atlas.under("", ["/a/b"]))
+        self.assertFalse(under(None, ["/a/b"]))
+        self.assertFalse(under("", ["/a/b"]))
 
 
 # ---------------------------------------------------------------------------
@@ -952,15 +1108,18 @@ CP_A = "7f3b2c10-6b58-4cdf-8a5e-b55b20f7d48a"
 
 
 class ReviewLedgerTests(TempAtlasCase):
-
     def setUp(self):
         super().setUp()
         self.sdir = self.cfg["project"]["work_dir"] / "sessions"
         self.sdir.mkdir(parents=True, exist_ok=True)
         self.ledger_path = self.cfg["project"]["review_ledger"]
-        self.rows = [self.session("claude", CL_A, "first"), self.session("claude", CL_B, "second"),
-                     self.session("copilot", CP_A, "third"), self.session("codex", CX_ROOT, None)]
-        dump_jsonl(atlas.work_paths(self.cfg)["sessions_index"], self.rows)
+        self.rows = [
+            self.session("claude", CL_A, "first"),
+            self.session("claude", CL_B, "second"),
+            self.session("copilot", CP_A, "third"),
+            self.session("codex", CX_ROOT, None),
+        ]
+        dump_jsonl(work_paths(self.cfg)["sessions_index"], self.rows)
 
     def session(self, source, sid, text):
         short = sid[:13] if source == "codex" else sid[:8]
@@ -968,18 +1127,23 @@ class ReviewLedgerTests(TempAtlasCase):
         if text is not None:
             cp = self.sdir / f"{source}_{short}.md"
             cp.write_text(text, encoding="utf-8")
-        return {"source": source, "id": sid, "short_id": short, "kind": "root",
-                "condensed_path": str(cp) if cp else None}
+        return {
+            "source": source,
+            "id": sid,
+            "short_id": short,
+            "kind": "root",
+            "condensed_path": str(cp) if cp else None,
+        }
 
     def mark(self, *argv):
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            rc = atlas.main(["--config", str(self.cfg_path), "mark-reviewed", *argv])
+            rc = main(["--config", str(self.cfg_path), "mark-reviewed", *argv])
         return rc, out.getvalue(), err.getvalue()
 
     def pending(self):
-        new, changed = atlas.pending_sessions(self.rows, atlas.load_ledger(self.ledger_path))
-        return [atlas.session_key(r) for r, *_ in new], [atlas.session_key(r) for r, *_ in changed]
+        new, changed = pending_sessions(self.rows, load_ledger(self.ledger_path))
+        return [session_key(r) for r, *_ in new], [session_key(r) for r, *_ in changed]
 
     def test_default_ledger_sits_next_to_knowledge_dir(self):
         self.assertEqual(self.ledger_path, self.tmp / "reviewed_sessions.jsonl")
@@ -1001,7 +1165,7 @@ class ReviewLedgerTests(TempAtlasCase):
 
     def test_row_records_sha_bytes_date_and_note(self):
         self.mark("copilot:7f3b", "--note", "merged")
-        row = atlas.load_ledger(self.ledger_path)["copilot:" + CP_A]
+        row = load_ledger(self.ledger_path)["copilot:" + CP_A]
         self.assertEqual(row["bytes"], len("third"))
         self.assertRegex(row["sha"], r"^[0-9a-f]{12}$")
         self.assertRegex(row["reviewed"], r"^\d{4}-\d\d-\d\d$")
@@ -1009,7 +1173,7 @@ class ReviewLedgerTests(TempAtlasCase):
 
     def test_session_without_condensed_text_can_be_marked(self):
         self.mark(CX_ROOT[:13])
-        self.assertEqual(atlas.load_ledger(self.ledger_path)["codex:" + CX_ROOT]["sha"], None)
+        self.assertEqual(load_ledger(self.ledger_path)["codex:" + CX_ROOT]["sha"], None)
         self.assertNotIn("codex:" + CX_ROOT, self.pending()[0])
 
     def test_ambiguous_or_unknown_id_writes_nothing(self):
@@ -1029,20 +1193,23 @@ class ReviewLedgerTests(TempAtlasCase):
     def write_report(self, rows):
         lines = ["New sessions (not reviewed): 2"]
         for r in rows:
-            sha, _ = atlas.condensed_digest(r)
-            lines += [f"  {r['source']}:{r['short_id']}  2026-10-30 06:33  root  sha={sha or '-'}  title",
-                      f"      {r['condensed_path']}"]
+            sha, _ = condensed_digest(r)
+            lines += [
+                f"  {r['source']}:{r['short_id']}  2026-10-30 06:33  root  sha={sha or '-'}  title",
+                f"      {r['condensed_path']}",
+            ]
         path = self.tmp / "report.txt"
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return path
 
     def test_report_marks_every_listed_session(self):
         report = self.write_report([self.rows[2], self.rows[3]])
-        self.assertEqual(atlas.parse_report(report), {"copilot:7f3b2c10": atlas.condensed_digest(self.rows[2])[0],
-                                                      "codex:" + CX_ROOT[:13]: None})
+        self.assertEqual(
+            parse_report(report), {"copilot:7f3b2c10": condensed_digest(self.rows[2])[0], "codex:" + CX_ROOT[:13]: None}
+        )
         rc, _, _ = self.mark("--report", str(report))
         self.assertEqual(rc, 0)
-        self.assertEqual(sorted(atlas.load_ledger(self.ledger_path)), ["codex:" + CX_ROOT, "copilot:" + CP_A])
+        self.assertEqual(sorted(load_ledger(self.ledger_path)), ["codex:" + CX_ROOT, "copilot:" + CP_A])
 
     def test_session_changed_after_the_report_stays_pending(self):
         report = self.write_report([self.rows[2]])
@@ -1060,17 +1227,18 @@ class ReviewLedgerTests(TempAtlasCase):
 
 
 class AtlasFeedbackTests(unittest.TestCase):
-
     def feedback(self, text):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "s.md"
             p.write_text(text, encoding="utf-8")
-            return [t for _, t in atlas.atlas_feedback(str(p))]
+            return [t for _, t in atlas_feedback(str(p))]
 
     def test_correction_in_a_session_that_read_the_atlas_is_reported(self):
-        hits = self.feedback("- `$ cat /home/user/ResearchAtlas/projects/demo_project/knowledge/INDEX.md`\n"
-                             "Three Atlas recording IDs differ from the actual CSV import keys.\n"
-                             "The pilot import works.\n")
+        hits = self.feedback(
+            "- `$ cat /home/user/ResearchAtlas/projects/demo_project/knowledge/INDEX.md`\n"
+            "Three Atlas recording IDs differ from the actual CSV import keys.\n"
+            "The pilot import works.\n"
+        )
         self.assertEqual(hits, ["Three Atlas recording IDs differ from the actual CSV import keys."])
 
     def test_session_that_never_read_the_atlas_reports_nothing(self):
@@ -1089,12 +1257,12 @@ class AtlasFeedbackTests(unittest.TestCase):
 # find (main(["--config", ..., "find", ...]))
 # ---------------------------------------------------------------------------
 
-class FindTests(TempAtlasCase):
 
+class FindTests(TempAtlasCase):
     def run_find(self, *terms):
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            rc = atlas.main(["--config", str(self.cfg_path), "find", *terms])
+            rc = main(["--config", str(self.cfg_path), "find", *terms])
         return rc, buf.getvalue()
 
     def write_knowledge(self, name, text):
@@ -1112,8 +1280,9 @@ class FindTests(TempAtlasCase):
 
     def test_words_may_sit_on_different_lines_of_one_section(self):
         # D26: "pilot import notebook" must find an entry that spreads those words over its bullets.
-        self.write_knowledge("experiments.md", "# E\n\n## Pilot import\n- notebook: `x.ipynb`\n\n"
-                                               "## Sensor\n- notebook: `y.ipynb`\n")
+        self.write_knowledge(
+            "experiments.md", "# E\n\n## Pilot import\n- notebook: `x.ipynb`\n\n## Sensor\n- notebook: `y.ipynb`\n"
+        )
         _, out = self.run_find("pilot", "import", "notebook")
         self.assertIn("experiments.md:3  Pilot import", out)
         self.assertNotIn("experiments.md:6", out)
@@ -1138,7 +1307,7 @@ class FindTests(TempAtlasCase):
         self.write_knowledge("a.md", "".join(f"## S{i}\npilot\n" for i in range(5)))
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            atlas.main(["--config", str(self.cfg_path), "find", "pilot", "--limit", "2"])
+            main(["--config", str(self.cfg_path), "find", "pilot", "--limit", "2"])
         self.assertEqual(buf.getvalue().count("a.md:"), 2)
         self.assertIn("(3 more", buf.getvalue())
 
@@ -1148,10 +1317,14 @@ class FindTests(TempAtlasCase):
         self.assertIn("INDEX.md:1  (top of file)", out)
 
     def test_existing_paths_with_most_sessions_come_first(self):
-        dump_jsonl(atlas.work_paths(self.cfg)["paths"], [
-            {"path": "/x/sensor_a", "status": "missing", "n_sessions": 9},
-            {"path": "/x/sensor_b", "status": "exists", "n_sessions": 1},
-            {"path": "/x/sensor_c", "status": "exists", "n_sessions": 5}])
+        dump_jsonl(
+            work_paths(self.cfg)["paths"],
+            [
+                {"path": "/x/sensor_a", "status": "missing", "n_sessions": 9},
+                {"path": "/x/sensor_b", "status": "exists", "n_sessions": 1},
+                {"path": "/x/sensor_c", "status": "exists", "n_sessions": 5},
+            ],
+        )
         _, out = self.run_find("sensor")
         self.assertLess(out.index("/x/sensor_c"), out.index("/x/sensor_b"))
         self.assertLess(out.index("/x/sensor_b"), out.index("/x/sensor_a"))
@@ -1162,7 +1335,8 @@ class FindTests(TempAtlasCase):
         (sdir / "codex_01a1619b-8270.md").write_text(
             "# codex:01a1619b-8270 — Pilot import check\n- kind: root\n\n### 2026-10-10 10:00 USER\n"
             "Where is the October pilot data?\n\n### 2026-10-10 10:01 AGENT\nOctober pilot data is in EXP.\n",
-            encoding="utf-8")
+            encoding="utf-8",
+        )
         _, out = self.run_find("october", "pilot")
         self.assertIn("== sessions: 1 matching transcripts", out)
         self.assertIn("  codex:01a1619b-8270 — Pilot import check  [2 msg]", out)

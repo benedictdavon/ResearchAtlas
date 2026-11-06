@@ -10,6 +10,7 @@ A source is one module here that provides this interface (a new source adds a mo
   condense(c, ctx, body_path) -> st. Parse one candidate into body_path; return the parse state.
   title(c, st, ctx)           -> str or None. Source title, tried before the first-user-text fallback.
 """
+
 from . import claude, codex, copilot
 
 SOURCES = {"codex": codex, "claude": claude, "copilot": copilot}
