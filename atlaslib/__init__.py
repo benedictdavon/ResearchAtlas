@@ -4,4 +4,4 @@ Modules: core (config and shared helpers), sources (Codex, Claude Code and Copil
 refresh, review, find, copilot_import, cli.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-06
+
 ### Added
 - Benchmark results for smaller models (Claude Haiku 5.5 and gpt-6-luna) in the benchmark report.
 
@@ -36,5 +38,6 @@ First public release.
 - End-to-end demo on a fictional project (`examples/demo`).
 - CI on Ubuntu and macOS with Python 3.11 to 3.13.
 
-[Unreleased]: https://github.com/benedictdavon/ResearchAtlas/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/benedictdavon/ResearchAtlas/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/benedictdavon/ResearchAtlas/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/benedictdavon/ResearchAtlas/releases/tag/v0.1.0
