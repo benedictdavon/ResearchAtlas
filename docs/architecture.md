@@ -24,6 +24,7 @@ ResearchAtlas/                    # source checkout; also the default atlas home
 │   ├── config.example.toml       # template written by `researchatlas init`
 │   └── sources/                  # codex.py, claude.py, copilot.py behind a small registry
 ├── tools/copilot_sync.py         # optional client-side selective Copilot upload over SSH/SCP (D24)
+├── examples/demo/                # end-to-end demo on a fictional project
 ├── tests/                        # stdlib unittest, synthetic transcripts only
 ├── config.toml                   # sources, project roots, filters, limits
 ├── projects/
